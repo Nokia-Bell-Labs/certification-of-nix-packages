@@ -1,0 +1,2042 @@
+# © 2026 Nokia
+# Licensed under the MIT License
+# SPDX-License-Identifier: MIT
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 2d4baec..088ea6c 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -307,6 +307,12 @@ version = "1.5.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+ 
++[[package]]
++name = "base64ct"
++version = "1.8.3"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
++
+ [[package]]
+ name = "bit-set"
+ version = "0.8.0"
+@@ -339,7 +345,16 @@ dependencies = [
+  "cc",
+  "cfg-if",
+  "constant_time_eq",
+- "cpufeatures",
++ "cpufeatures 0.3.0",
++]
++
++[[package]]
++name = "block-buffer"
++version = "0.10.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
++dependencies = [
++ "generic-array",
+ ]
+ 
+ [[package]]
+@@ -493,6 +508,12 @@ version = "0.4.32"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "cc14f565cf027a105f7a44ccf9e5b424348421a1d8952a8fc9d499d313107789"
+ 
++[[package]]
++name = "const-oid"
++version = "0.9.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
++
+ [[package]]
+ name = "const-oid"
+ version = "0.10.2"
+@@ -514,6 +535,15 @@ dependencies = [
+  "unicode-segmentation",
+ ]
+ 
++[[package]]
++name = "cpufeatures"
++version = "0.2.17"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
++dependencies = [
++ "libc",
++]
++
+ [[package]]
+ name = "cpufeatures"
+ version = "0.3.0"
+@@ -589,6 +619,16 @@ version = "0.2.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
+ 
++[[package]]
++name = "crypto-common"
++version = "0.1.7"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
++dependencies = [
++ "generic-array",
++ "typenum",
++]
++
+ [[package]]
+ name = "crypto-common"
+ version = "0.2.1"
+@@ -605,9 +645,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "b5eed333089e2e1c1ac8c6c0398e5e2497b4c9926ca6d0365ed1e099afa5bc23"
+ dependencies = [
+  "cfg-if",
+- "cpufeatures",
++ "cpufeatures 0.3.0",
+  "curve25519-dalek-derive",
+- "digest",
++ "digest 0.11.2",
+  "fiat-crypto",
+  "rustc_version",
+  "subtle",
+@@ -631,6 +671,17 @@ version = "2.11.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
+ 
++[[package]]
++name = "der"
++version = "0.7.10"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
++dependencies = [
++ "const-oid 0.9.6",
++ "pem-rfc7468",
++ "zeroize",
++]
++
+ [[package]]
+ name = "deranged"
+ version = "0.5.8"
+@@ -663,15 +714,26 @@ dependencies = [
+  "unicode-xid",
+ ]
+ 
++[[package]]
++name = "digest"
++version = "0.10.7"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
++dependencies = [
++ "block-buffer 0.10.4",
++ "const-oid 0.9.6",
++ "crypto-common 0.1.7",
++]
++
+ [[package]]
+ name = "digest"
+ version = "0.11.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
+ dependencies = [
+- "block-buffer",
+- "const-oid",
+- "crypto-common",
++ "block-buffer 0.12.0",
++ "const-oid 0.10.2",
++ "crypto-common 0.2.1",
+ ]
+ 
+ [[package]]
+@@ -691,7 +753,7 @@ version = "3.0.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a"
+ dependencies = [
+- "signature",
++ "signature 3.0.0",
+ ]
+ 
+ [[package]]
+@@ -702,7 +764,7 @@ checksum = "6ebaa1a2bf1290ab3bfe5a7b771d050ebffab2711c19a81691c683a5144a25de"
+ dependencies = [
+  "curve25519-dalek",
+  "ed25519",
+- "sha2",
++ "sha2 0.11.0",
+  "subtle",
+  "zeroize",
+ ]
+@@ -838,6 +900,16 @@ dependencies = [
+  "slab",
+ ]
+ 
++[[package]]
++name = "generic-array"
++version = "0.14.7"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
++dependencies = [
++ "typenum",
++ "version_check",
++]
++
+ [[package]]
+ name = "getrandom"
+ version = "0.2.17"
+@@ -929,8 +1001,10 @@ dependencies = [
+  "askama_escape",
+  "async-compression",
+  "bytes",
++ "data-encoding",
+  "futures-core",
+  "futures-util",
++ "harmonia-cactee-verify",
+  "harmonia-file-core",
+  "harmonia-file-nar",
+  "harmonia-store-db",
+@@ -963,6 +1037,19 @@ dependencies = [
+  "zstd-safe",
+ ]
+ 
++[[package]]
++name = "harmonia-cactee-verify"
++version = "3.1.0"
++dependencies = [
++ "data-encoding",
++ "rand 0.8.8",
++ "rsa",
++ "serde",
++ "serde_json",
++ "sha2 0.10.9",
++ "thiserror",
++]
++
+ [[package]]
+ name = "harmonia-client"
+ version = "3.1.0"
+@@ -1285,7 +1372,7 @@ dependencies = [
+  "serde",
+  "serde_json",
+  "sha1",
+- "sha2",
++ "sha2 0.11.0",
+  "thiserror",
+  "tokio",
+ ]
+@@ -1578,6 +1665,9 @@ name = "lazy_static"
+ version = "1.5.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
++dependencies = [
++ "spin",
++]
+ 
+ [[package]]
+ name = "libbz2-rs-sys"
+@@ -1591,6 +1681,12 @@ version = "0.2.186"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
+ 
++[[package]]
++name = "libm"
++version = "0.2.16"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
++
+ [[package]]
+ name = "libsqlite3-sys"
+ version = "0.38.1"
+@@ -1715,12 +1811,47 @@ dependencies = [
+  "windows-sys 0.61.2",
+ ]
+ 
++[[package]]
++name = "num-bigint-dig"
++version = "0.8.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e661dda6640fad38e827a6d4a310ff4763082116fe217f279885c97f511bb0b7"
++dependencies = [
++ "lazy_static",
++ "libm",
++ "num-integer",
++ "num-iter",
++ "num-traits",
++ "rand 0.8.8",
++ "smallvec",
++ "zeroize",
++]
++
+ [[package]]
+ name = "num-conv"
+ version = "0.2.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "c6673768db2d862beb9b39a78fdcb1a69439615d5794a1be50caa9bc92c81967"
+ 
++[[package]]
++name = "num-integer"
++version = "0.1.47"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
++dependencies = [
++ "num-traits",
++]
++
++[[package]]
++name = "num-iter"
++version = "0.1.46"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b"
++dependencies = [
++ "num-integer",
++ "num-traits",
++]
++
+ [[package]]
+ name = "num-traits"
+ version = "0.2.19"
+@@ -1728,6 +1859,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+ dependencies = [
+  "autocfg",
++ "libm",
+ ]
+ 
+ [[package]]
+@@ -1797,6 +1929,15 @@ dependencies = [
+  "windows-link",
+ ]
+ 
++[[package]]
++name = "pem-rfc7468"
++version = "0.7.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "88b39c9bfcfc231068454382784bb460aae594343fb030d46e9f50a645418412"
++dependencies = [
++ "base64ct",
++]
++
+ [[package]]
+ name = "percent-encoding"
+ version = "2.3.2"
+@@ -1809,6 +1950,27 @@ version = "0.2.17"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
+ 
++[[package]]
++name = "pkcs1"
++version = "0.7.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
++dependencies = [
++ "der",
++ "pkcs8",
++ "spki",
++]
++
++[[package]]
++name = "pkcs8"
++version = "0.10.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
++dependencies = [
++ "der",
++ "spki",
++]
++
+ [[package]]
+ name = "pkg-config"
+ version = "0.3.33"
+@@ -1909,8 +2071,8 @@ dependencies = [
+  "bit-vec",
+  "bitflags",
+  "num-traits",
+- "rand",
+- "rand_chacha",
++ "rand 0.9.4",
++ "rand_chacha 0.9.0",
+  "rand_xorshift",
+  "regex-syntax",
+  "rusty-fork",
+@@ -1956,14 +2118,35 @@ version = "6.0.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+ 
++[[package]]
++name = "rand"
++version = "0.8.8"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
++dependencies = [
++ "libc",
++ "rand_chacha 0.3.1",
++ "rand_core 0.6.4",
++]
++
+ [[package]]
+ name = "rand"
+ version = "0.9.4"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
+ dependencies = [
+- "rand_chacha",
+- "rand_core",
++ "rand_chacha 0.9.0",
++ "rand_core 0.9.5",
++]
++
++[[package]]
++name = "rand_chacha"
++version = "0.3.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
++dependencies = [
++ "ppv-lite86",
++ "rand_core 0.6.4",
+ ]
+ 
+ [[package]]
+@@ -1973,7 +2156,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+ dependencies = [
+  "ppv-lite86",
+- "rand_core",
++ "rand_core 0.9.5",
++]
++
++[[package]]
++name = "rand_core"
++version = "0.6.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
++dependencies = [
++ "getrandom 0.2.17",
+ ]
+ 
+ [[package]]
+@@ -1991,7 +2183,7 @@ version = "0.4.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+ dependencies = [
+- "rand_core",
++ "rand_core 0.9.5",
+ ]
+ 
+ [[package]]
+@@ -2078,6 +2270,27 @@ dependencies = [
+  "windows-sys 0.52.0",
+ ]
+ 
++[[package]]
++name = "rsa"
++version = "0.9.10"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "b8573f03f5883dcaebdfcf4725caa1ecb9c15b2ef50c43a07b816e06799bb12d"
++dependencies = [
++ "const-oid 0.9.6",
++ "digest 0.10.7",
++ "num-bigint-dig",
++ "num-integer",
++ "num-traits",
++ "pkcs1",
++ "pkcs8",
++ "rand_core 0.6.4",
++ "sha2 0.10.9",
++ "signature 2.2.0",
++ "spki",
++ "subtle",
++ "zeroize",
++]
++
+ [[package]]
+ name = "rsqlite-vfs"
+ version = "0.1.0"
+@@ -2305,8 +2518,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
+ dependencies = [
+  "cfg-if",
+- "cpufeatures",
+- "digest",
++ "cpufeatures 0.3.0",
++ "digest 0.11.2",
++]
++
++[[package]]
++name = "sha2"
++version = "0.10.9"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
++dependencies = [
++ "cfg-if",
++ "cpufeatures 0.2.17",
++ "digest 0.10.7",
+ ]
+ 
+ [[package]]
+@@ -2316,8 +2540,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
+ dependencies = [
+  "cfg-if",
+- "cpufeatures",
+- "digest",
++ "cpufeatures 0.3.0",
++ "digest 0.11.2",
+ ]
+ 
+ [[package]]
+@@ -2345,6 +2569,16 @@ dependencies = [
+  "libc",
+ ]
+ 
++[[package]]
++name = "signature"
++version = "2.2.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
++dependencies = [
++ "digest 0.10.7",
++ "rand_core 0.6.4",
++]
++
+ [[package]]
+ name = "signature"
+ version = "3.0.0"
+@@ -2383,6 +2617,22 @@ dependencies = [
+  "windows-sys 0.61.2",
+ ]
+ 
++[[package]]
++name = "spin"
++version = "0.9.9"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
++
++[[package]]
++name = "spki"
++version = "0.7.3"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "d91ed6c858b01f942cd56b37a94b3e0a1798290327d1236e4d9cf4eaca44d29d"
++dependencies = [
++ "base64ct",
++ "der",
++]
++
+ [[package]]
+ name = "sqlite-wasm-rs"
+ version = "0.5.2"
+@@ -2786,6 +3036,12 @@ version = "0.2.15"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+ 
++[[package]]
++name = "version_check"
++version = "0.9.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
++
+ [[package]]
+ name = "wait-timeout"
+ version = "0.2.1"
+diff --git a/Cargo.toml b/Cargo.toml
+index bdbe469..dea53f7 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -25,6 +25,8 @@ members = [
+     "harmonia-daemon",
+     "harmonia-utils-test",
+     "harmonia-bench",
++    # nixtee: CACTEE certificate verification
++    "harmonia-cactee-verify",
+ ]
+ resolver = "2"
+ 
+@@ -97,6 +99,7 @@ tempfile        = "3.27"
+ tokio-test      = "0.4"
+ 
+ # Internal crates
++harmonia-cactee-verify         = { path = "harmonia-cactee-verify" } # nixtee
+ harmonia-file-core             = { path = "harmonia-file-core" }
+ harmonia-file-nar              = { path = "harmonia-file-nar" }
+ harmonia-protocol              = { path = "harmonia-protocol" }
+diff --git a/harmonia-cache/Cargo.toml b/harmonia-cache/Cargo.toml
+index cf5e9bc..dc3de62 100644
+--- a/harmonia-cache/Cargo.toml
++++ b/harmonia-cache/Cargo.toml
+@@ -51,6 +51,9 @@ harmonia-store-path-info     = { workspace = true }
+ harmonia-utils-base-encoding = { workspace = true }
+ harmonia-utils-hash          = { workspace = true }
+ harmonia-utils-signature     = { workspace = true }
++# nixtee (Othmane Tabiane): CACTEE certificate verification
++harmonia-cactee-verify       = { workspace = true }
++data-encoding                = { workspace = true }
+ nix                          = { workspace = true, features = [ "socket", "fs" ] }
+ prometheus                   = { workspace = true }
+ 
+diff --git a/harmonia-cache/src/config.rs b/harmonia-cache/src/config.rs
+index cdd295b..d2b3a23 100644
+--- a/harmonia-cache/src/config.rs
++++ b/harmonia-cache/src/config.rs
+@@ -30,6 +30,10 @@ fn default_enable_compression() -> bool {
+     false
+ }
+ 
++fn default_cvm_attestation_dir() -> PathBuf {
++    "/var/lib/nix-certification".into()
++}
++
+ /// zstd parameters applied to on-the-fly NAR encoding when the client sends
+ /// `Accept-Encoding: zstd`. Defaults are tuned for a substitution cache:
+ /// level 1 with long-distance matching beats the libzstd default (level 3)
+@@ -136,6 +140,30 @@ pub(crate) struct Config {
+     pub(crate) secret_keys: Vec<SecretKey>,
+     #[serde(skip)]
+     pub(crate) store: Store,
++
++    /// Directory holding out-of-band CVM attestation files,
++    /// one JSON per store path, named <hashPart>.json.
++    #[serde(default = "default_cvm_attestation_dir")]
++    pub(crate) cvm_attestation_dir: PathBuf,
++
++    // nixtee BEGIN (Othmane Tabiane): CACTEE certificate verification
++    /// `cactee-manifest.json` (expected MRENCLAVE and service hashes).
++    /// When set, every certificate is verified before its Cvm* lines are served.
++    #[serde(default)]
++    pub(crate) cvm_manifest: Option<PathBuf>,
++    /// Answer 404 for a path without a certificate that verifies.
++    #[serde(default)]
++    pub(crate) cvm_require_certificate: bool,
++    /// Azure Attestation JSON Web Key Set (`<service url>/certs`), to check
++    /// the token embedded in each certificate.
++    #[serde(default)]
++    pub(crate) cvm_azure_jwks: Option<PathBuf>,
++    /// Simulated CACTEE: certificates carry no Azure token. Never in production.
++    #[serde(default)]
++    pub(crate) cvm_azure_simulate: bool,
++    #[serde(skip)]
++    pub(crate) cvm_verifier: Option<crate::cvm::CvmVerifier>,
++    // nixtee END
+ }
+ 
+ impl Config {
+@@ -241,5 +269,26 @@ pub(crate) fn load() -> Result<Config> {
+         .into());
+     }
+     settings.store = Store::new(store_dir, settings.real_nix_store.clone(), db_path);
++
++    // nixtee BEGIN (Othmane Tabiane): CACTEE certificate verification
++    match &settings.cvm_manifest {
++        Some(manifest) => {
++            let verifier = crate::cvm::CvmVerifier::load(
++                manifest,
++                settings.cvm_azure_jwks.as_ref(),
++                settings.cvm_azure_simulate,
++            )
++            .map_err(|reason| ConfigError::Invalid { reason })?;
++            settings.cvm_verifier = Some(verifier);
++        }
++        None if settings.cvm_require_certificate => {
++            return Err(ConfigError::Invalid {
++                reason: "cvm_require_certificate needs cvm_manifest".to_string(),
++            }
++            .into());
++        }
++        None => {}
++    }
++    // nixtee END
+     Ok(settings)
+ }
+diff --git a/harmonia-cache/src/cvm.rs b/harmonia-cache/src/cvm.rs
+new file mode 100644
+index 0000000..428bcb2
+--- /dev/null
++++ b/harmonia-cache/src/cvm.rs
+@@ -0,0 +1,142 @@
++// nixtee (Othmane Tabiane): new file, not part of upstream Harmonia.
++//! Serve only certified paths: verify the CACTEE certificate of a store path
++//! before its narinfo goes out.
++//!
++//! The certificate is `<cvm_attestation_dir>/<hashPart>.json`, written by the
++//! import API. It is checked with `harmonia-cactee-verify`:
++//!
++//! - steps 01–03 on the certificate itself (SGX quote, Azure token,
++//!   controller signature, service info against the manifest);
++//! - step 05 against the narHash in the cache database: that is the sha256
++//!   of the NAR this server will stream, so the certificate is bound to the
++//!   exact bytes served.
++//!
++//! The Cvm* narinfo lines are then built from verified data only.
++//! Results are cached per hash part until the certificate file changes.
++
++use harmonia_cactee_verify::{Azure, Manifest, verify_for_nar};
++use harmonia_store_path_info::CvmAttestation;
++use serde_json::Value;
++use std::collections::HashMap;
++use std::path::{Path, PathBuf};
++use std::sync::Mutex;
++use std::time::SystemTime;
++
++/// Certificate file (mtime, size) and the verification result for it.
++type Cached = (SystemTime, u64, Result<CvmAttestation, String>);
++
++pub(crate) struct CvmVerifier {
++    manifest: Manifest,
++    /// Azure Attestation keys (`<service url>/certs`), or None when CACTEE is simulated.
++    jwks: Option<Value>,
++    /// (certificate mtime, size) -> result, per hash part.
++    cache: Mutex<HashMap<String, Cached>>,
++}
++
++impl CvmVerifier {
++    pub(crate) fn load(
++        manifest: &Path,
++        jwks: Option<&PathBuf>,
++        simulate: bool,
++    ) -> Result<CvmVerifier, String> {
++        let raw = std::fs::read_to_string(manifest)
++            .map_err(|e| format!("cannot read cvm_manifest {}: {e}", manifest.display()))?;
++        let manifest = Manifest::from_json(&raw)
++            .map_err(|e| format!("invalid cvm_manifest {}: {e}", manifest.display()))?;
++        let jwks = match (jwks, simulate) {
++            (Some(path), _) => {
++                let raw = std::fs::read_to_string(path)
++                    .map_err(|e| format!("cannot read cvm_azure_jwks {}: {e}", path.display()))?;
++                Some(
++                    serde_json::from_str(&raw)
++                        .map_err(|e| format!("invalid cvm_azure_jwks {}: {e}", path.display()))?,
++                )
++            }
++            (None, true) => None,
++            (None, false) => {
++                return Err(
++                    "cvm_manifest is set: set cvm_azure_jwks (Azure Attestation keys) \
++                            or cvm_azure_simulate = true"
++                        .into(),
++                );
++            }
++        };
++        if jwks.is_none() {
++            tracing::warn!("cvm: Azure attestation tokens are NOT checked (cvm_azure_simulate)");
++        }
++        Ok(CvmVerifier {
++            manifest,
++            jwks,
++            cache: Mutex::new(HashMap::new()),
++        })
++    }
++
++    /// Verified Cvm* fields for `hash`, or why it is not certified.
++    /// `nar_name` is `<hash>-<name>.nar`, `nar_sha256` the narHash digest.
++    pub(crate) fn verified(
++        &self,
++        dir: &Path,
++        hash: &str,
++        nar_name: &str,
++        nar_sha256: &[u8],
++    ) -> Result<CvmAttestation, String> {
++        let file = dir.join(format!("{hash}.json"));
++        let meta = std::fs::metadata(&file).map_err(|_| "no certificate".to_string())?;
++        let mtime = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
++        if let Some((t, len, res)) = self.cache.lock().expect("cvm cache").get(hash)
++            && *t == mtime
++            && *len == meta.len()
++        {
++            return res.clone();
++        }
++        let res = self.check(&file, nar_name, nar_sha256);
++        self.cache
++            .lock()
++            .expect("cvm cache")
++            .insert(hash.to_owned(), (mtime, meta.len(), res.clone()));
++        res
++    }
++
++    fn check(
++        &self,
++        file: &Path,
++        nar_name: &str,
++        nar_sha256: &[u8],
++    ) -> Result<CvmAttestation, String> {
++        let raw =
++            std::fs::read_to_string(file).map_err(|e| format!("cannot read certificate: {e}"))?;
++        let cert: Value =
++            serde_json::from_str(&raw).map_err(|e| format!("certificate is not JSON: {e}"))?;
++        let azure = match &self.jwks {
++            Some(jwks) => Azure::Jwks(jwks),
++            None => Azure::Simulated,
++        };
++        let report = verify_for_nar(&cert, &self.manifest, azure, nar_name, nar_sha256);
++        if !report.ok() {
++            return Err(report.failures());
++        }
++        tracing::debug!("cvm: {nar_name}: {}", report.summary());
++        let text = |k: &str| cert.get(k).and_then(Value::as_str).map(str::to_owned);
++        let mut inputs: Vec<String> = cert
++            .get("inputs")
++            .and_then(Value::as_array)
++            .map(|a| {
++                a.iter()
++                    .filter_map(|v| v.as_str().map(str::to_owned))
++                    .collect()
++            })
++            .unwrap_or_default();
++        inputs.sort();
++        Ok(CvmAttestation {
++            attestation_type: text("type").unwrap_or_else(|| "cactee-asset-certificate".into()),
++            backend: text("backend").unwrap_or_else(|| "cactee".into()),
++            quote: cert["duet_admin_quote"]["quote"]
++                .as_str()
++                .unwrap_or_default()
++                .to_owned(),
++            // From the verified NAR hash, never from the file.
++            output_hash: format!("sha256-{}", data_encoding::BASE64.encode(nar_sha256)),
++            input_hashes: inputs,
++        })
++    }
++}
+diff --git a/harmonia-cache/src/main.rs b/harmonia-cache/src/main.rs
+index 2d83162..d8bf597 100644
+--- a/harmonia-cache/src/main.rs
++++ b/harmonia-cache/src/main.rs
+@@ -29,6 +29,7 @@ macro_rules! build_bytes {
+ mod buildlog;
+ mod cacheinfo;
+ mod config;
++mod cvm; // nixtee (Othmane Tabiane)
+ mod error;
+ mod health;
+ mod nar;
+diff --git a/harmonia-cache/src/narinfo.rs b/harmonia-cache/src/narinfo.rs
+index 61a964b..44f63cc 100644
+--- a/harmonia-cache/src/narinfo.rs
++++ b/harmonia-cache/src/narinfo.rs
+@@ -2,8 +2,9 @@ use crate::error::{CacheError, StoreError};
+ use actix_web::{HttpResponse, http, web};
+ use harmonia_store_nar_info::{build_narinfo, format_narinfo_txt};
+ use harmonia_store_path::StorePathHash;
+-use harmonia_store_path_info::StorePathKeyed;
++use harmonia_store_path_info::{CvmAttestation, StorePathKeyed};
+ use serde::Deserialize;
++use std::path::Path;
+ 
+ use crate::config::Config;
+ use crate::{cache_control_max_age_1d, some_or_404};
+@@ -13,6 +14,37 @@ pub struct Param {
+     json: Option<String>,
+ }
+ 
++/// On-disk attestation file, one per store path.
++/// Unknown fields (version, producer, derivation, timestamp) are ignored.
++#[derive(Debug, Deserialize)]
++struct CvmAttestationFile {
++    #[serde(rename = "type")]
++    attestation_type: String,
++    backend: String,
++    quote: String,
++    #[serde(rename = "outputHash")]
++    output_hash: String,
++    #[serde(default)]
++    inputs: Vec<String>,
++}
++
++/// Reads the attestation for a store path, if one was published.
++/// A missing or malformed file is not an error: the narinfo is then
++/// served without the Cvm* fields.
++fn read_attestation(dir: &Path, hash: &str) -> Option<CvmAttestation> {
++    let raw = std::fs::read_to_string(dir.join(format!("{hash}.json"))).ok()?;
++    let f: CvmAttestationFile = serde_json::from_str(&raw).ok()?;
++    let mut inputs = f.inputs;
++    inputs.sort();
++    Some(CvmAttestation {
++        attestation_type: f.attestation_type,
++        backend: f.backend,
++        quote: f.quote,
++        output_hash: f.output_hash,
++        input_hashes: inputs,
++    })
++}
++
+ pub(crate) async fn get(
+     hash: web::Path<String>,
+     param: web::Query<Param>,
+@@ -33,6 +65,34 @@ pub(crate) async fn get(
+             .store
+             .query_path_info_by_hash_part(&store_path_hash)?
+     );
++
++    // nixtee BEGIN (Othmane Tabiane): serve only certified paths.
++    // Without cvm_manifest, keep the old behaviour (fields copied from the file).
++    let cvm = match &settings.cvm_verifier {
++        None => read_attestation(&settings.cvm_attestation_dir, &hash),
++        Some(verifier) => {
++            let nar_name = format!("{}.nar", info.path);
++            match verifier.verified(
++                &settings.cvm_attestation_dir,
++                &hash,
++                &nar_name,
++                info.info.nar_hash.digest_bytes(),
++            ) {
++                Ok(att) => Some(att),
++                Err(reason) => {
++                    tracing::warn!("cvm: {nar_name} not certified: {reason}");
++                    if settings.cvm_require_certificate {
++                        return Ok(HttpResponse::NotFound()
++                            .insert_header(crate::cache_control_no_store())
++                            .body(format!("not certified: {reason}")));
++                    }
++                    None
++                }
++            }
++        }
++    };
++    // nixtee END
++
+     let narinfo = build_narinfo(
+         settings.store.store_dir(),
+         StorePathKeyed {
+@@ -50,7 +110,7 @@ pub(crate) async fn get(
+             .json(&narinfo.info))
+     } else {
+         let url = narinfo.info.url.clone().unwrap_or_default();
+-        let res = format_narinfo_txt(settings.store.store_dir(), &narinfo);
++        let res = format_narinfo_txt(settings.store.store_dir(), &narinfo, cvm.as_ref());
+         Ok(HttpResponse::Ok()
+             .insert_header((http::header::CONTENT_TYPE, "text/x-nix-narinfo"))
+             .insert_header(("Nix-Link", url))
+diff --git a/harmonia-cactee-verify/Cargo.toml b/harmonia-cactee-verify/Cargo.toml
+new file mode 100644
+index 0000000..a6fdac1
+--- /dev/null
++++ b/harmonia-cactee-verify/Cargo.toml
+@@ -0,0 +1,27 @@
++# nixtee (Othmane Tabiane): new crate, not part of upstream Harmonia.
++[package]
++name                 = "harmonia-cactee-verify"
++version.workspace    = true
++authors.workspace    = true
++edition.workspace    = true
++license.workspace    = true
++homepage.workspace   = true
++repository.workspace = true
++description          = "Verify CACTEE asset certificates (SGX quote, Azure token, controller signature, service info, output hash)"
++
++[dependencies]
++data-encoding = { workspace = true }
++serde         = { workspace = true }
++# float_roundtrip: parse floats exactly, so they re-serialise like Python.
++serde_json    = { workspace = true, features = [ "float_roundtrip" ] }
++thiserror     = { workspace = true }
++# RustCrypto: RSA-PSS (controller signature) and PKCS#1 v1.5 (Azure token).
++rsa           = { version = "0.9", default-features = false, features = [ "std", "sha2", "pem" ] }
++sha2_10       = { package = "sha2", version = "0.10", features = [ "oid" ] }
++
++[dev-dependencies]
++rsa           = { version = "0.9", features = [ "std", "sha2" ] }
++rand          = "0.8"
++
++[lints]
++workspace = true
+diff --git a/harmonia-cactee-verify/src/canonical.rs b/harmonia-cactee-verify/src/canonical.rs
+new file mode 100644
+index 0000000..95ae959
+--- /dev/null
++++ b/harmonia-cactee-verify/src/canonical.rs
+@@ -0,0 +1,172 @@
++//! Re-serialise JSON exactly like Python's `json.dumps(obj, sort_keys=True)`.
++//!
++//! CACTEE signs `json.dumps(duet_service_result, sort_keys=True)`. To check
++//! that signature we must rebuild the very same bytes from the parsed JSON:
++//!
++//! - separators `", "` and `": "`;
++//! - object keys sorted by code point;
++//! - `ensure_ascii`: every non-ASCII character escaped as `\uXXXX`
++//!   (surrogate pairs above U+FFFF);
++//! - floats written as Python's `repr(float)`: shortest round-trip digits,
++//!   fixed notation for 1e-4 <= |x| < 1e16, otherwise `1.5e-05` style
++//!   (sign always written, at least two exponent digits).
++
++use serde_json::{Number, Value};
++use std::fmt::Write as _;
++
++pub fn python_dumps_sorted(value: &Value) -> String {
++    let mut out = String::new();
++    write_value(&mut out, value);
++    out
++}
++
++fn write_value(out: &mut String, value: &Value) {
++    match value {
++        Value::Null => out.push_str("null"),
++        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
++        Value::Number(n) => write_number(out, n),
++        Value::String(s) => write_string(out, s),
++        Value::Array(items) => {
++            out.push('[');
++            for (i, item) in items.iter().enumerate() {
++                if i > 0 {
++                    out.push_str(", ");
++                }
++                write_value(out, item);
++            }
++            out.push(']');
++        }
++        Value::Object(map) => {
++            let mut keys: Vec<&String> = map.keys().collect();
++            keys.sort();
++            out.push('{');
++            for (i, key) in keys.iter().enumerate() {
++                if i > 0 {
++                    out.push_str(", ");
++                }
++                write_string(out, key);
++                out.push_str(": ");
++                write_value(out, &map[key.as_str()]);
++            }
++            out.push('}');
++        }
++    }
++}
++
++fn write_string(out: &mut String, s: &str) {
++    out.push('"');
++    for c in s.chars() {
++        match c {
++            '"' => out.push_str("\\\""),
++            '\\' => out.push_str("\\\\"),
++            '\n' => out.push_str("\\n"),
++            '\r' => out.push_str("\\r"),
++            '\t' => out.push_str("\\t"),
++            '\u{08}' => out.push_str("\\b"),
++            '\u{0c}' => out.push_str("\\f"),
++            c if (c as u32) < 0x20 || (c as u32) > 0x7e => {
++                let mut buf = [0u16; 2];
++                for unit in c.encode_utf16(&mut buf) {
++                    let _ = write!(out, "\\u{unit:04x}");
++                }
++            }
++            c => out.push(c),
++        }
++    }
++    out.push('"');
++}
++
++fn write_number(out: &mut String, n: &Number) {
++    if let Some(i) = n.as_i64() {
++        let _ = write!(out, "{i}");
++    } else if let Some(u) = n.as_u64() {
++        let _ = write!(out, "{u}");
++    } else if let Some(f) = n.as_f64() {
++        out.push_str(&python_float_repr(f));
++    }
++}
++
++/// `repr(float)` in CPython (float_repr_style = 'short').
++pub fn python_float_repr(f: f64) -> String {
++    if f.is_nan() {
++        return "NaN".into();
++    }
++    if f.is_infinite() {
++        return if f > 0.0 { "Infinity" } else { "-Infinity" }.into();
++    }
++    if f == 0.0 {
++        return if f.is_sign_negative() { "-0.0" } else { "0.0" }.into();
++    }
++    // Rust's `{:e}` gives the shortest round-trip digits, like Python.
++    let sci = format!("{f:e}"); // e.g. "-1.0348831963211275e-5"
++    let (mantissa, exp) = sci.split_once('e').expect("{:e} always has an exponent");
++    let exp: i32 = exp.parse().expect("integer exponent");
++    let (sign, mantissa) = match mantissa.strip_prefix('-') {
++        Some(m) => ("-", m),
++        None => ("", mantissa),
++    };
++    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
++    let mut out = String::from(sign);
++    if (-4..16).contains(&exp) {
++        // fixed notation; decimal point after (exp + 1) digits
++        let point = exp + 1;
++        if point <= 0 {
++            out.push_str("0.");
++            out.extend(std::iter::repeat_n('0', (-point) as usize));
++            out.push_str(&digits);
++        } else if point as usize >= digits.len() {
++            out.push_str(&digits);
++            out.extend(std::iter::repeat_n('0', point as usize - digits.len()));
++            out.push_str(".0");
++        } else {
++            out.push_str(&digits[..point as usize]);
++            out.push('.');
++            out.push_str(&digits[point as usize..]);
++        }
++    } else {
++        out.push_str(&digits[..1]);
++        if digits.len() > 1 {
++            out.push('.');
++            out.push_str(&digits[1..]);
++        }
++        let _ = write!(out, "e{}{:02}", if exp < 0 { '-' } else { '+' }, exp.abs());
++    }
++    out
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn floats_like_python() {
++        // expected strings produced by CPython 3 repr()
++        let cases = [
++            (1.0348831963211275e-05, "1.0348831963211275e-05"),
++            (0.06753007866698402, "0.06753007866698402"),
++            (1774289172.8759155, "1774289172.8759155"),
++            (52.3667, "52.3667"),
++            (4.9, "4.9"),
++            (0.0001, "0.0001"),
++            (1e16, "1e+16"),
++            (1.5e16, "1.5e+16"),
++            (123456789012345.0, "123456789012345.0"),
++            (5.0, "5.0"),
++            (-2.5e-7, "-2.5e-07"),
++            (1e100, "1e+100"),
++        ];
++        for (f, want) in cases {
++            assert_eq!(python_float_repr(f), want, "{f:e}");
++        }
++    }
++
++    #[test]
++    fn sorted_keys_separators_and_ascii() {
++        let v: Value =
++            serde_json::from_str(r#"{"b": [1, 2.5, "é😀"], "a": {"y": null, "x": true}}"#).unwrap();
++        assert_eq!(
++            python_dumps_sorted(&v),
++            "{\"a\": {\"x\": true, \"y\": null}, \"b\": [1, 2.5, \"\\u00e9\\ud83d\\ude00\"]}"
++        );
++    }
++}
+diff --git a/harmonia-cactee-verify/src/jwt.rs b/harmonia-cactee-verify/src/jwt.rs
+new file mode 100644
+index 0000000..45d05db
+--- /dev/null
++++ b/harmonia-cactee-verify/src/jwt.rs
+@@ -0,0 +1,150 @@
++// nixtee (Othmane Tabiane): new crate, not part of upstream Harmonia.
++//! The Azure Attestation token embedded in a CACTEE certificate.
++//!
++//! Azure Attestation checks the SGX quote and returns a JSON Web Token
++//! (`header.payload.signature`, base64url, RS256) signed with keys it
++//! publishes at `<service url>/certs`. Anyone can therefore check it later
++//! without Azure credentials:
++//!
++//! 1. the signature, with the key named by `kid` in that key set;
++//! 2. `iss` = the attestation service;
++//! 3. `sgx-mrenclave` = the manifest and the quote;
++//! 4. `x-ms-sgx-report-data` starts with sha256(PEM) = the quote's report data;
++//! 5. `x-ms-sgx-collateral.quotehash` = sha256(quote).
++//!
++//! `exp`/`nbf` are NOT checked: the token is minted at build time and the
++//! certificate is checked later (publish, install), when it has usually
++//! expired. Same choice as the C++ verifier; to be settled with CACTEE.
++
++use crate::{MRENCLAVE_AT, REPORT_DATA_AT, sha256_hex};
++use data_encoding::{BASE64URL_NOPAD, HEXLOWER};
++use rsa::{BigUint, Pkcs1v15Sign, RsaPublicKey};
++use serde_json::Value;
++use sha2_10::{Digest, Sha256};
++
++fn b64url(s: &str) -> Option<Vec<u8>> {
++    BASE64URL_NOPAD
++        .decode(s.trim_end_matches('=').as_bytes())
++        .ok()
++}
++
++/// The attestation URL comes from the (untrusted) certificate: accept only
++/// `https://<host>[:port]` on an Azure Attestation host.
++pub fn azure_endpoint(url: &str) -> Result<String, String> {
++    let rest = url
++        .strip_prefix("https://")
++        .ok_or_else(|| format!("attestation service url {url:?} is not https"))?;
++    let hostport = rest.strip_suffix('/').unwrap_or(rest);
++    if hostport.is_empty() || hostport.contains(['/', '@', '?', '#']) {
++        return Err(format!(
++            "attestation service url {url:?} is not https://<host>"
++        ));
++    }
++    let host = hostport.split(':').next().unwrap_or_default();
++    if host != "attest.azure.net" && !host.ends_with(".attest.azure.net") {
++        return Err(format!(
++            "attestation service url {url:?} is not an Azure Attestation host"
++        ));
++    }
++    Ok(format!("https://{hostport}"))
++}
++
++fn rsa_key(jwk: &Value) -> Option<RsaPublicKey> {
++    if jwk
++        .get("kty")
++        .and_then(Value::as_str)
++        .is_some_and(|k| k != "RSA")
++    {
++        return None;
++    }
++    let n = b64url(jwk.get("n")?.as_str()?)?;
++    let e = b64url(jwk.get("e")?.as_str()?)?;
++    RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).ok()
++}
++
++/// Returns the problems found (empty = the token vouches for this quote).
++pub fn verify_azure_token(
++    token: &str,
++    endpoint: &str,
++    jwks: &Value,
++    quote: &[u8],
++    pem: &[u8],
++    expected_mrenclave: &str,
++) -> Vec<String> {
++    let parts: Vec<&str> = token.split('.').collect();
++    if parts.len() != 3 {
++        return vec!["attestation token is not a JWT".into()];
++    }
++    let decoded = (
++        b64url(parts[0]).and_then(|b| serde_json::from_slice::<Value>(&b).ok()),
++        b64url(parts[1]).and_then(|b| serde_json::from_slice::<Value>(&b).ok()),
++        b64url(parts[2]),
++    );
++    let (Some(header), Some(payload), Some(signature)) = decoded else {
++        return vec!["attestation token could not be decoded".into()];
++    };
++    if header.get("alg").and_then(Value::as_str) != Some("RS256") {
++        return vec!["attestation token algorithm is not RS256".into()];
++    }
++    let keys = jwks
++        .get("keys")
++        .and_then(Value::as_array)
++        .cloned()
++        .unwrap_or_default();
++    let jwk = match header.get("kid").and_then(Value::as_str) {
++        Some(kid) => keys
++            .iter()
++            .find(|k| k.get("kid").and_then(Value::as_str) == Some(kid)),
++        None if keys.len() == 1 => keys.first(),
++        None => return vec!["attestation token has no key id".into()],
++    };
++    let Some(jwk) = jwk else {
++        return vec!["attestation token key id is not in the service keys".into()];
++    };
++    let Some(key) = rsa_key(jwk) else {
++        return vec!["attestation signing key could not be read".into()];
++    };
++    let signing_input = format!("{}.{}", parts[0], parts[1]);
++    let digest = Sha256::digest(signing_input.as_bytes());
++    if key
++        .verify(Pkcs1v15Sign::new::<Sha256>(), &digest, &signature)
++        .is_err()
++    {
++        return vec!["attestation token signature does not match".into()];
++    }
++
++    let mut problems = Vec::new();
++    let claim = |k: &str| {
++        payload
++            .get(k)
++            .and_then(Value::as_str)
++            .unwrap_or_default()
++            .to_owned()
++    };
++    if claim("iss").trim_end_matches('/') != endpoint.trim_end_matches('/') {
++        problems.push("token issuer is not the attestation service".into());
++    }
++    let mr = claim("sgx-mrenclave");
++    if mr != expected_mrenclave {
++        problems.push("token mrenclave does not match the manifest".into());
++    }
++    if mr != HEXLOWER.encode(&quote[MRENCLAVE_AT..MRENCLAVE_AT + 32]) {
++        problems.push("token mrenclave does not match the quote".into());
++    }
++    let report_data = claim("x-ms-sgx-report-data");
++    let report_key = report_data.get(..64).unwrap_or_default();
++    if report_key != sha256_hex(pem) {
++        problems.push("token report data does not match the public key".into());
++    }
++    if report_key != HEXLOWER.encode(&quote[REPORT_DATA_AT..REPORT_DATA_AT + 32]) {
++        problems.push("token report data does not match the quote".into());
++    }
++    let quotehash = payload
++        .get("x-ms-sgx-collateral")
++        .and_then(|c| c.get("quotehash"))
++        .and_then(Value::as_str);
++    if quotehash != Some(sha256_hex(quote).as_str()) {
++        problems.push("token quote hash does not match the quote".into());
++    }
++    problems
++}
+diff --git a/harmonia-cactee-verify/src/lib.rs b/harmonia-cactee-verify/src/lib.rs
+new file mode 100644
+index 0000000..5fb121c
+--- /dev/null
++++ b/harmonia-cactee-verify/src/lib.rs
+@@ -0,0 +1,317 @@
++// nixtee (Othmane Tabiane): new crate, not part of upstream Harmonia.
++//! Verify CACTEE asset certificates.
++//!
++//! Rust port of the checks in the Nix fork's
++//! `src/certification-verification/certificate-verifier.cc` (Muhammad
++//! Aetisam) and of `Docker/cache/cactee_verify.py`. The step names match.
++//!
++//! A certificate (CACTEE `AssetCertificate`) looks like:
++//!
++//! ```text
++//! duet_admin_quote                   { quote: base64 SGX quote, public_key: PEM, jwt?: Azure token }
++//! duet_admin_attestation_service_url "https://<name>.attest.azure.net"
++//! duet_service_result                { service_info: {..}, service_result: { hashes: { outputs: {..} } } }
++//! duet_admin_signature               base64 RSA-PSS-SHA256 over python json.dumps(duet_service_result, sort_keys=True)
++//! ```
++//!
++//! | step                       | checks                                                            | needs     |
++//! |----------------------------|-------------------------------------------------------------------|-----------|
++//! | `01_duet_admin_quote`      | quote MRENCLAVE = manifest, quote report_data = sha256(PEM), JWT  | cert      |
++//! | `02_controller_signature`  | RSA-PSS signature over the service result with that PEM           | cert      |
++//! | `03_duet_service_info`     | service code / tools / dependencies hashes = manifest             | cert      |
++//! | `05_output_hashes`         | the NAR's sha256 = the certificate's `<hash>-<name>.nar` output    | NAR hash  |
++//!
++//! The crate does no I/O: the caller reads the certificate, the manifest and
++//! (for real Azure tokens) the attestation service's JSON Web Key Set.
++
++pub mod canonical;
++pub mod jwt;
++
++use data_encoding::{BASE64, HEXLOWER};
++use rsa::pkcs8::DecodePublicKey;
++use rsa::{Pss, RsaPublicKey};
++use serde::Deserialize;
++use serde_json::Value;
++use sha2_10::{Digest, Sha256};
++
++/// SGX DCAP quote: 48-byte header + 384-byte report body.
++pub const QUOTE_MIN_LEN: usize = 400;
++/// MRENCLAVE: report body offset 64.
++pub const MRENCLAVE_AT: usize = 112;
++/// REPORT_DATA: report body offset 320; first 32 bytes = sha256(PEM).
++pub const REPORT_DATA_AT: usize = 368;
++
++/// What the verifier expects, from `cactee-manifest.json`.
++#[derive(Debug, Clone, Deserialize)]
++pub struct Manifest {
++    #[serde(rename = "EXPECTED_DUET_ADMIN_MRENCLAVE")]
++    pub mrenclave: String,
++    #[serde(rename = "EXPECTED_DUET_SERVICE_INFO")]
++    pub service_info: ExpectedServiceInfo,
++}
++
++#[derive(Debug, Clone, Deserialize)]
++pub struct ExpectedServiceInfo {
++    pub service_code_hash: String,
++    pub service_tools_hashes: Value,
++    /// Accepted dependency hashes, e.g. {"cpu": "...", "gpu": "..."}.
++    pub service_dependencies_hash: serde_json::Map<String, Value>,
++}
++
++impl Manifest {
++    pub fn from_json(raw: &str) -> Result<Self, serde_json::Error> {
++        serde_json::from_str(raw)
++    }
++}
++
++/// How the Azure attestation token is checked.
++#[derive(Debug, Clone, Copy)]
++pub enum Azure<'a> {
++    /// Simulated CACTEE: no token to check. Never use in production.
++    Simulated,
++    /// Check `duet_admin_quote.jwt` against this JSON Web Key Set
++    /// (from `<attestation service url>/certs`).
++    Jwks(&'a Value),
++}
++
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct Step {
++    pub name: &'static str,
++    pub ok: bool,
++    pub detail: Vec<String>,
++}
++
++impl Step {
++    fn new(name: &'static str) -> Self {
++        Step {
++            name,
++            ok: false,
++            detail: Vec::new(),
++        }
++    }
++}
++
++#[derive(Debug, Clone, Default, PartialEq, Eq)]
++pub struct Report {
++    pub steps: Vec<Step>,
++}
++
++impl Report {
++    pub fn ok(&self) -> bool {
++        !self.steps.is_empty() && self.steps.iter().all(|s| s.ok)
++    }
++
++    /// "01_duet_admin_quote=ok 02_controller_signature=FAIL …"
++    pub fn summary(&self) -> String {
++        self.steps
++            .iter()
++            .map(|s| format!("{}={}", s.name, if s.ok { "ok" } else { "FAIL" }))
++            .collect::<Vec<_>>()
++            .join(" ")
++    }
++
++    /// The reasons of the failed steps, for logs and error messages.
++    pub fn failures(&self) -> String {
++        self.steps
++            .iter()
++            .filter(|s| !s.ok)
++            .map(|s| format!("{}: {}", s.name, s.detail.join(", ")))
++            .collect::<Vec<_>>()
++            .join("; ")
++    }
++}
++
++pub fn sha256_hex(data: &[u8]) -> String {
++    HEXLOWER.encode(&Sha256::digest(data))
++}
++
++fn b64(s: &str) -> Option<Vec<u8>> {
++    // Certificates may wrap base64; ignore whitespace.
++    let clean: String = s.chars().filter(|c| !c.is_whitespace()).collect();
++    BASE64.decode(clean.as_bytes()).ok()
++}
++
++fn str_at<'a>(v: &'a Value, path: &[&str]) -> Option<&'a str> {
++    path.iter().try_fold(v, |v, k| v.get(k))?.as_str()
++}
++
++/// Steps 01–03: everything that needs only the certificate.
++pub fn verify_certificate(cert: &Value, manifest: &Manifest, azure: Azure<'_>) -> Report {
++    let mut report = Report::default();
++    let pem = str_at(cert, &["duet_admin_quote", "public_key"]);
++
++    // 01 -- quote
++    let mut s1 = Step::new("01_duet_admin_quote");
++    let quote = str_at(cert, &["duet_admin_quote", "quote"]).map(b64);
++    let url = str_at(cert, &["duet_admin_attestation_service_url"]).filter(|u| !u.is_empty());
++    match (pem, quote, url) {
++        (None, _, _) | (_, None, _) => s1.detail.push("quote or public key is missing".into()),
++        (_, Some(None), _) => s1.detail.push("quote is not base64".into()),
++        (_, _, None) => s1.detail.push("attestation service url is missing".into()),
++        (Some(pem), Some(Some(quote)), Some(url)) => {
++            if quote.len() < QUOTE_MIN_LEN {
++                s1.detail.push(format!(
++                    "quote is {} bytes, expected >= {QUOTE_MIN_LEN}",
++                    quote.len()
++                ));
++            } else {
++                let quote_mr = HEXLOWER.encode(&quote[MRENCLAVE_AT..MRENCLAVE_AT + 32]);
++                let quote_key = HEXLOWER.encode(&quote[REPORT_DATA_AT..REPORT_DATA_AT + 32]);
++                let key_ok = quote_key == sha256_hex(pem.as_bytes());
++                let mr_ok = quote_mr == manifest.mrenclave;
++                if !key_ok {
++                    s1.detail
++                        .push("public key hash does not match quote report_data".into());
++                }
++                if !mr_ok {
++                    s1.detail
++                        .push("mrenclave does not match the manifest".into());
++                }
++                let jwt_ok = match azure {
++                    Azure::Simulated => {
++                        s1.detail
++                            .push("azure simulated: attestation token not checked".into());
++                        true
++                    }
++                    Azure::Jwks(jwks) => match jwt::azure_endpoint(url) {
++                        Err(e) => {
++                            s1.detail.push(e);
++                            false
++                        }
++                        Ok(endpoint) => match str_at(cert, &["duet_admin_quote", "jwt"]) {
++                            None => {
++                                s1.detail.push(
++                                    "attestation token (duet_admin_quote.jwt) is missing".into(),
++                                );
++                                false
++                            }
++                            Some(token) => {
++                                let problems = jwt::verify_azure_token(
++                                    token,
++                                    &endpoint,
++                                    jwks,
++                                    &quote,
++                                    pem.as_bytes(),
++                                    &manifest.mrenclave,
++                                );
++                                let ok = problems.is_empty();
++                                s1.detail.extend(problems);
++                                ok
++                            }
++                        },
++                    },
++                };
++                s1.ok = key_ok && mr_ok && jwt_ok;
++            }
++        }
++    }
++    report.steps.push(s1);
++
++    // 02 -- controller signature over the service result
++    let mut s2 = Step::new("02_controller_signature");
++    let result = cert.get("duet_service_result").filter(|v| v.is_object());
++    let signature = str_at(cert, &["duet_admin_signature"]).and_then(b64);
++    match (pem, result, signature) {
++        (Some(pem), Some(result), Some(signature)) => {
++            let message = canonical::python_dumps_sorted(result);
++            s2.ok = verify_pss(pem, message.as_bytes(), &signature);
++            if !s2.ok {
++                s2.detail.push("signature does not match".into());
++            }
++        }
++        _ => s2
++            .detail
++            .push("signature, service result or public key is missing".into()),
++    }
++    report.steps.push(s2);
++
++    // 03 -- the service that ran is the expected one
++    let mut s3 = Step::new("03_duet_service_info");
++    match result
++        .and_then(|r| r.get("service_info"))
++        .filter(|v| v.is_object())
++    {
++        None => s3.detail.push("service_info is missing".into()),
++        Some(info) => {
++            let want = &manifest.service_info;
++            let code_ok = info.get("service_code_hash").and_then(Value::as_str)
++                == Some(&want.service_code_hash);
++            let tools_ok = info.get("service_tools_hashes") == Some(&want.service_tools_hashes);
++            let deps_ok = info
++                .get("service_dependencies_hash")
++                .is_some_and(|d| want.service_dependencies_hash.values().any(|w| w == d));
++            for (ok, what) in [
++                (code_ok, "service_code_hash"),
++                (tools_ok, "service_tools_hashes"),
++                (deps_ok, "service_dependencies_hash"),
++            ] {
++                if !ok {
++                    s3.detail
++                        .push(format!("{what} does not match the manifest"));
++                }
++            }
++            s3.ok = code_ok && tools_ok && deps_ok;
++        }
++    }
++    report.steps.push(s3);
++
++    report
++}
++
++/// The sha256 (lowercase hex) the certificate gives for the output file
++/// `nar_name` (`<hash>-<name>.nar`), if it names that file.
++pub fn certified_nar_hash<'a>(cert: &'a Value, nar_name: &str) -> Option<&'a str> {
++    cert.get("duet_service_result")?
++        .get("service_result")?
++        .get("hashes")?
++        .get("outputs")?
++        .get(nar_name)?
++        .as_str()
++}
++
++/// Step 05: the NAR we serve is the one the certificate names.
++pub fn check_output(cert: &Value, nar_name: &str, nar_sha256: &[u8]) -> Step {
++    let mut s5 = Step::new("05_output_hashes");
++    let have = HEXLOWER.encode(nar_sha256);
++    match certified_nar_hash(cert, nar_name) {
++        None => s5
++            .detail
++            .push(format!("certificate has no output named {nar_name}")),
++        Some(want) if want.eq_ignore_ascii_case(&have) => s5.ok = true,
++        Some(want) => s5.detail.push(format!(
++            "{nar_name}: NAR sha256 {have} != certificate {want}"
++        )),
++    }
++    s5
++}
++
++/// Steps 01–05 at once, for a NAR whose sha256 is already known (the cache
++/// database's narHash is exactly that).
++pub fn verify_for_nar(
++    cert: &Value,
++    manifest: &Manifest,
++    azure: Azure<'_>,
++    nar_name: &str,
++    nar_sha256: &[u8],
++) -> Report {
++    let mut report = verify_certificate(cert, manifest, azure);
++    report.steps.push(check_output(cert, nar_name, nar_sha256));
++    report
++}
++
++/// RSA-PSS, SHA-256, MGF1-SHA-256, with the salt length CACTEE signs with:
++/// Python `padding.PSS.MAX_LENGTH` = emLen - hLen - 2
++/// (emLen = ceil((modBits - 1) / 8), hLen = 32).
++fn verify_pss(pem: &str, message: &[u8], signature: &[u8]) -> bool {
++    use rsa::traits::PublicKeyParts;
++    let Ok(key) = RsaPublicKey::from_public_key_pem(pem) else {
++        return false;
++    };
++    let em_len = (key.n().bits() - 1).div_ceil(8);
++    let Some(max_salt) = em_len.checked_sub(32 + 2) else {
++        return false;
++    };
++    let digest = Sha256::digest(message);
++    key.verify(Pss::new_with_salt::<Sha256>(max_salt), &digest, signature)
++        .is_ok()
++}
+diff --git a/harmonia-cactee-verify/tests/data/cactee-manifest.json b/harmonia-cactee-verify/tests/data/cactee-manifest.json
+new file mode 100644
+index 0000000..c5e008d
+--- /dev/null
++++ b/harmonia-cactee-verify/tests/data/cactee-manifest.json
+@@ -0,0 +1,14 @@
++{
++  "EXPECTED_DUET_ADMIN_MRENCLAVE": "9cd38b0f69562e81f5ae50e1a57b79b454f7f68595a7d4e5e34b6c75c4d154c8",
++  "EXPECTED_DUET_SERVICE_INFO": {
++    "service_code_hash": "b853d36744e9ca4b7105b25c5e3dd26d91c99f166bce1ed8264bbf77eaefe683",
++    "service_tools_hashes": {
++      "huggingface": "86e3b11ab5475b83ada1f34cae1089aff14eb236e3814fbb42228d517a5c8bb9",
++      "build_tools.py": "95fb3d065af5c8c1b25e0cb22a76c193cafe57158c7eee85849bc1c94bf8f4ab"
++    },
++    "service_dependencies_hash": {
++      "cpu": "91aa92dc4e204aead93fd0797c991dab8fb8b198138e4ad3dc803e350a809d2b",
++      "gpu": "06e8368f5451b021c83ac2b41ceac201a5bcdba3193377d84a7c0b0ffffb1e29"
++    }
++  }
++}
+diff --git a/harmonia-cactee-verify/tests/data/sample-certificate.json b/harmonia-cactee-verify/tests/data/sample-certificate.json
+new file mode 100644
+index 0000000..0adf9a7
+--- /dev/null
++++ b/harmonia-cactee-verify/tests/data/sample-certificate.json
+@@ -0,0 +1,130 @@
++{
++    "duet_admin_quote": {
++        "quote": "AwACAAAAAAALABAAk5pyM/ecTKmUCg2zlX8GB2IkyMHFsQZL7FmqUX1/dJ0AAAAAEBAREP//AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAADnAAAAAAAAAJzTiw9pVi6B9a5Q4aV7ebRU9/aFlafU5eNLbHXE0VTIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUHJPu1BTbqUBJ+Xzc8C7Frvoq3zSFTXMwEmdjnIrxzwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7wpt7SQyWyPpOSc95vDlD/1gwmnuVA7uzo+HFPG8R5wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAxhAAACSLaokY29o5pp31POWq2/EkFNkvBa8796iZL9YHc3kOQqbiy3lhzfh+QG4FN2nvlXEMUq/e9nJf8OrQaCr6vqbRu0CVrszAuXEQUTZJrBZHZAWqpJ4HYTkE+mPUn+CR74nYEoBOAItFvAlCMeyHBFZ+dQS1q5hmWr4LxZkpl7mAEBAREP//AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFQAAAAAAAADnAAAAAAAAAHj+jP0BCVoPEIr/XEBiS5NhLWwotz4ajSgXnJ3fDgaGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACMT1d115ZQPpYTf3fGioKaAFasje1wFAsIGwlEkMV7/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEACwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7HuIujYk6Zt6YT5Gib3m+n5syKJ3AbBAI7bAkCoOKCQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/c2I39N9WHZadbUejrtmhcwqQEl3sH/+595caIgMuRDhK8oxBrc2KbJl4pL15frsDp0VkuhBW1y6d2MgI7UsuiAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8FAF4OAAAtLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJRThUQ0NCSmlnQXdJQkFnSVVJV3Rjb0JhUVd3ZGI5NmJSWVo3bzdSbm9OSzR3Q2dZSUtvWkl6ajBFQXdJdwpjREVpTUNBR0ExVUVBd3daU1c1MFpXd2dVMGRZSUZCRFN5QlFiR0YwWm05eWJTQkRRVEVhTUJnR0ExVUVDZ3dSClNXNTBaV3dnUTI5eWNHOXlZWFJwYjI0eEZEQVNCZ05WQkFjTUMxTmhiblJoSUVOc1lYSmhNUXN3Q1FZRFZRUUkKREFKRFFURUxNQWtHQTFVRUJoTUNWVk13SGhjTk1qVXdOakkxTVRjeE9UUTRXaGNOTXpJd05qSTFNVGN4T1RRNApXakJ3TVNJd0lBWURWUVFEREJsSmJuUmxiQ0JUUjFnZ1VFTkxJRU5sY25ScFptbGpZWFJsTVJvd0dBWURWUVFLCkRCRkpiblJsYkNCRGIzSndiM0poZEdsdmJqRVVNQklHQTFVRUJ3d0xVMkZ1ZEdFZ1EyeGhjbUV4Q3pBSkJnTlYKQkFnTUFrTkJNUXN3Q1FZRFZRUUdFd0pWVXpCWk1CTUdCeXFHU000OUFnRUdDQ3FHU000OUF3RUhBMElBQlBOeQpIdXdqWU9kbElza3dMamt5ZXdPUGhOU0VMSDVKb2VINWlqYndBZHVSWkYyRUFHOFhDblVzZWpNRm52VVVSbWw4CjFBcFRETy9USDZRb0hQUlBmNktqZ2dNT01JSURDakFmQmdOVkhTTUVHREFXZ0JTVmIxM052UnZoNlVCSnlkVDAKTTg0QlZ3dmVWREJyQmdOVkhSOEVaREJpTUdDZ1hxQmNobHBvZEhSd2N6b3ZMMkZ3YVM1MGNuVnpkR1ZrYzJWeQpkbWxqWlhNdWFXNTBaV3d1WTI5dEwzTm5lQzlqWlhKMGFXWnBZMkYwYVc5dUwzWTBMM0JqYTJOeWJEOWpZVDF3CmJHRjBabTl5YlNabGJtTnZaR2x1Wnoxa1pYSXdIUVlEVlIwT0JCWUVGSGFNZHZXd1BuNDRaVStjdlplZkFiWHcKbGhydE1BNEdBMVVkRHdFQi93UUVBd0lHd0RBTUJnTlZIUk1CQWY4RUFqQUFNSUlDT3dZSktvWklodmhOQVEwQgpCSUlDTERDQ0FpZ3dIZ1lLS29aSWh2aE5BUTBCQVFRUXA0WkhheEhvTDd3NFJLdjU2enZKS1RDQ0FXVUdDaXFHClNJYjRUUUVOQVFJd2dnRlZNQkFHQ3lxR1NJYjRUUUVOQVFJQkFnRVFNQkFHQ3lxR1NJYjRUUUVOQVFJQ0FnRVEKTUJBR0N5cUdTSWI0VFFFTkFRSURBZ0VETUJBR0N5cUdTSWI0VFFFTkFRSUVBZ0VETUJFR0N5cUdTSWI0VFFFTgpBUUlGQWdJQS96QVJCZ3NxaGtpRytFMEJEUUVDQmdJQ0FQOHdFQVlMS29aSWh2aE5BUTBCQWdjQ0FRRXdFQVlMCktvWklodmhOQVEwQkFnZ0NBUUF3RUFZTEtvWklodmhOQVEwQkFna0NBUUF3RUFZTEtvWklodmhOQVEwQkFnb0MKQVFBd0VBWUxLb1pJaHZoTkFRMEJBZ3NDQVFBd0VBWUxLb1pJaHZoTkFRMEJBZ3dDQVFBd0VBWUxLb1pJaHZoTgpBUTBCQWcwQ0FRQXdFQVlMS29aSWh2aE5BUTBCQWc0Q0FRQXdFQVlMS29aSWh2aE5BUTBCQWc4Q0FRQXdFQVlMCktvWklodmhOQVEwQkFoQUNBUUF3RUFZTEtvWklodmhOQVEwQkFoRUNBUTB3SHdZTEtvWklodmhOQVEwQkFoSUUKRUJBUUF3UC8vd0VBQUFBQUFBQUFBQUF3RUFZS0tvWklodmhOQVEwQkF3UUNBQUF3RkFZS0tvWklodmhOQVEwQgpCQVFHQUdCcUFBQUFNQThHQ2lxR1NJYjRUUUVOQVFVS0FRRXdIZ1lLS29aSWh2aE5BUTBCQmdRUU9ISm9sQzZHCjV4U1NXY1VwcWlRRnhqQkVCZ29xaGtpRytFMEJEUUVITURZd0VBWUxLb1pJaHZoTkFRMEJCd0VCQWY4d0VBWUwKS29aSWh2aE5BUTBCQndJQkFRQXdFQVlMS29aSWh2aE5BUTBCQndNQkFRQXdDZ1lJS29aSXpqMEVBd0lEUndBdwpSQUlnYXJNNXdUMzdmQjQ3bGFMNG43dzRndkNHMCtiWDJPR3FXYTZMeHdTQWZGUUNJSGZuTWQxVWVOdXhqTHpCCkk2UWRjY0xBbXFVK2hJVENNaUJoWkpqdzNSNzkKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQotLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJQ2xqQ0NBajJnQXdJQkFnSVZBSlZ2WGMyOUcrSHBRRW5KMVBRenpnRlhDOTVVTUFvR0NDcUdTTTQ5QkFNQwpNR2d4R2pBWUJnTlZCQU1NRVVsdWRHVnNJRk5IV0NCU2IyOTBJRU5CTVJvd0dBWURWUVFLREJGSmJuUmxiQ0JECmIzSndiM0poZEdsdmJqRVVNQklHQTFVRUJ3d0xVMkZ1ZEdFZ1EyeGhjbUV4Q3pBSkJnTlZCQWdNQWtOQk1Rc3cKQ1FZRFZRUUdFd0pWVXpBZUZ3MHhPREExTWpFeE1EVXdNVEJhRncwek16QTFNakV4TURVd01UQmFNSEF4SWpBZwpCZ05WQkFNTUdVbHVkR1ZzSUZOSFdDQlFRMHNnVUd4aGRHWnZjbTBnUTBFeEdqQVlCZ05WQkFvTUVVbHVkR1ZzCklFTnZjbkJ2Y21GMGFXOXVNUlF3RWdZRFZRUUhEQXRUWVc1MFlTQkRiR0Z5WVRFTE1Ba0dBMVVFQ0F3Q1EwRXgKQ3pBSkJnTlZCQVlUQWxWVE1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRU5TQi83dDIxbFhTTwoyQ3V6cHh3NzRlSkI3MkV5REdnVzVyWEN0eDJ0VlRMcTZoS2s2eitVaVJaQ25xUjdwc092Z3FGZVN4bG1UbEpsCmVUbWkyV1l6M3FPQnV6Q0J1REFmQmdOVkhTTUVHREFXZ0JRaVpReldXcDAwaWZPRHRKVlN2MUFiT1NjR3JEQlMKQmdOVkhSOEVTekJKTUVlZ1JhQkRoa0ZvZEhSd2N6b3ZMMk5sY25ScFptbGpZWFJsY3k1MGNuVnpkR1ZrYzJWeQpkbWxqWlhNdWFXNTBaV3d1WTI5dEwwbHVkR1ZzVTBkWVVtOXZkRU5CTG1SbGNqQWRCZ05WSFE0RUZnUVVsVzlkCnpiMGI0ZWxBU2NuVTlEUE9BVmNMM2xRd0RnWURWUjBQQVFIL0JBUURBZ0VHTUJJR0ExVWRFd0VCL3dRSU1BWUIKQWY4Q0FRQXdDZ1lJS29aSXpqMEVBd0lEUndBd1JBSWdYc1ZraTB3K2k2VllHVzNVRi8yMnVhWGUwWUpEajFVZQpuQStUakQxYWk1Y0NJQ1liMVNBbUQ1eGtmVFZwdm80VW95aVNZeHJEV0xtVVI0Q0k5Tkt5ZlBOKwotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpNSUlDanpDQ0FqU2dBd0lCQWdJVUltVU0xbHFkTkluemc3U1ZVcjlRR3prbkJxd3dDZ1lJS29aSXpqMEVBd0l3CmFERWFNQmdHQTFVRUF3d1JTVzUwWld3Z1UwZFlJRkp2YjNRZ1EwRXhHakFZQmdOVkJBb01FVWx1ZEdWc0lFTnYKY25CdmNtRjBhVzl1TVJRd0VnWURWUVFIREF0VFlXNTBZU0JEYkdGeVlURUxNQWtHQTFVRUNBd0NRMEV4Q3pBSgpCZ05WQkFZVEFsVlRNQjRYRFRFNE1EVXlNVEV3TkRVeE1Gb1hEVFE1TVRJek1USXpOVGsxT1Zvd2FERWFNQmdHCkExVUVBd3dSU1c1MFpXd2dVMGRZSUZKdmIzUWdRMEV4R2pBWUJnTlZCQW9NRVVsdWRHVnNJRU52Y25CdmNtRjAKYVc5dU1SUXdFZ1lEVlFRSERBdFRZVzUwWVNCRGJHRnlZVEVMTUFrR0ExVUVDQXdDUTBFeEN6QUpCZ05WQkFZVApBbFZUTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFQzZuRXdNRElZWk9qL2lQV3NDemFFS2k3CjFPaU9TTFJGaFdHamJuQlZKZlZua1k0dTNJamtEWVlMME14TzRtcXN5WWpsQmFsVFZZeEZQMnNKQks1emxLT0IKdXpDQnVEQWZCZ05WSFNNRUdEQVdnQlFpWlF6V1dwMDBpZk9EdEpWU3YxQWJPU2NHckRCU0JnTlZIUjhFU3pCSgpNRWVnUmFCRGhrRm9kSFJ3Y3pvdkwyTmxjblJwWm1sallYUmxjeTUwY25WemRHVmtjMlZ5ZG1salpYTXVhVzUwClpXd3VZMjl0TDBsdWRHVnNVMGRZVW05dmRFTkJMbVJsY2pBZEJnTlZIUTRFRmdRVUltVU0xbHFkTkluemc3U1YKVXI5UUd6a25CcXd3RGdZRFZSMFBBUUgvQkFRREFnRUdNQklHQTFVZEV3RUIvd1FJTUFZQkFmOENBUUV3Q2dZSQpLb1pJemowRUF3SURTUUF3UmdJaEFPVy81UWtSK1M5Q2lTRGNOb293THVQUkxzV0dmL1lpN0dTWDk0Qmd3VHdnCkFpRUE0SjBsckhvTXMrWG81by9zWDZPOVFXeEhSQXZaVUdPZFJRN2N2cVJYYXFJPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCgA=",
++        "public_key": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAt9DHUNWAprCRaPC7vo86\n5bTYNiiCGqhENRNK09KhcESOjldzUf+Bpf+yoIO8sbQXGtgBfE1Bbsp5CptU9ncU\nxAH6UvigRAQ8IwbEaWutRkQ59Rhf858xv2shEEKc+o0lMv/L10Dx/OSdXxMHh5gr\nPlWE0UJiugh3L7qpLTPWx7LLSxNczF0oQWehrENzmMPtJFphnMfPyBBKZ7froFXj\n7Zy7zSG1377HsAnBM58ZCFggzDB8UulOKwZXHTlELr13oRaH8JcOpviWo/20pSp8\nskVaUY941mGzUNyNxNPhkCDHnH+o8yw2UmF09UTJquFZGu8iXGPEGOwPf1IXmtpU\nXDtfFj044uxay6w/tEqSkwZdAozYYW9eaKmpWIzwWlIFrDphX5soBxVGgYuS4Wha\nMDZdj/GkOBVFYUPS/AvdkI3tZSPSbIf2zE2WsDmoZg9il4/siuGLzKWSXU4vKBNq\ni0vL1WxbhdF03ORpD+tTLMvh0D/m51gptVYh7/yAK+OC1ZVQvNZRy5EfFckxTFSR\nA486F/aqblz3zZ2p043xMHfGjLgxLjKP/Gh5cr6UmFwyHzJZ7EAJ7C/JPNv97EA5\nGEVGn+a+3sVHM4hnVmLcOffr3pLlTAz727jlbimStgFnbizStHghf+40/UISsDF0\nVuh8nkdZgVw5QcArXNyVTzECAwEAAQ==\n-----END PUBLIC KEY-----\n"
++    },
++    "duet_admin_attestation_service_url": "https://sharedneu.neu.attest.azure.net",
++    "duet_service_result": {
++        "service_info": {
++            "service_code_hash": "b853d36744e9ca4b7105b25c5e3dd26d91c99f166bce1ed8264bbf77eaefe683",
++            "service_dependencies_hash": "06e8368f5451b021c83ac2b41ceac201a5bcdba3193377d84a7c0b0ffffb1e29",
++            "service_location": {
++                "6423a8f7dbc60f3d970acdefa71dc4f0415ac868697fb377c0ce0dd768a167ad": {
++                    "cloud_provider_metadata_result": {
++                        "azEnvironment": "AzurePublicCloud",
++                        "location": "westeurope"
++                    },
++                    "geoip_api_lookup_result": {
++                        "http://ip-api.com/json/": {
++                            "city": "Amsterdam",
++                            "country": "Netherlands",
++                            "countryCode": "NL",
++                            "lat": 52.3667,
++                            "lon": 4.9
++                        },
++                        "https://api.ipwho.org/ip/": {},
++                        "https://apip.cc/json": {
++                            "City": "Amsterdam",
++                            "CountryCode": "NL",
++                            "CountryName": "The Netherlands",
++                            "Latitude": "52.3759",
++                            "Longitude": "4.8975"
++                        },
++                        "https://free.freeipapi.com/api/json/": {
++                            "cityName": "Amsterdam",
++                            "countryCode": "NL",
++                            "countryName": "The Netherlands",
++                            "latitude": 52.3676,
++                            "longitude": 4.90414
++                        },
++                        "https://geoapi.info/api/geo": {},
++                        "https://ipinfo.io/": {
++                            "city": "Amsterdam",
++                            "country": "NL",
++                            "loc": "52.3740,4.8897"
++                        },
++                        "https://reallyfreegeoip.org/json/": {
++                            "city": "Amsterdam",
++                            "country_code": "NL",
++                            "country_name": "The Netherlands",
++                            "latitude": 52.3759,
++                            "longitude": 4.8975
++                        }
++                    },
++                    "rtt_based_estimation_result": {
++                        "closest_areas_rtt_ms": {
++                            "Alphen Aan Den Rijn, NL": 3.077,
++                            "Amsterdam, NL": 0.924,
++                            "Arnhem, NL": 4.558,
++                            "Capelle Aan Den Ijssel, NL": 3.461,
++                            "Delft, NL": 2.712,
++                            "Dronten, NL": 2.116,
++                            "Duesseldorf, DE": 4.095,
++                            "Dusseldorf, DE": 4.006,
++                            "Ede, NL": 2.471,
++                            "Haarlem, NL": 1.609,
++                            "Harderwijk, NL": 3.516,
++                            "Hoofddorp, NL": 1.391,
++                            "Meppel, NL": 3.54,
++                            "Rotterdam, NL": 2.057,
++                            "Schiphol Rijk, NL": 1.834,
++                            "Steenbergen, NL": 5.167,
++                            "The Hague, NL": 2.77,
++                            "Utrecht, NL": 2.173,
++                            "Veendam, NL": 4.378,
++                            "Zaventem, BE": 4.891
++                        },
++                        "estimated_coordinates": {
++                            "latitude": 52.22671871201438,
++                            "longitude": 4.9838660105135135
++                        },
++                        "estimated_possible_countries": {
++                            "BE": 0.010135232050181674,
++                            "DE": 0.029566437866833068,
++                            "NL": 0.9602983300829852
++                        },
++                        "reverse_geocode_lookup": {
++                            "https://api.bigdatacloud.net/data/reverse-geocode-client": {
++                                "city": "Gemeente De Ronde Venen",
++                                "countryCode": "NL",
++                                "countryName": "Netherlands (Kingdom of the)"
++                            }
++                        }
++                    },
++                    "service_owner_config_result": "westeurope"
++                }
++            },
++            "service_tools_hashes": {
++                "build_tools.py": "95fb3d065af5c8c1b25e0cb22a76c193cafe57158c7eee85849bc1c94bf8f4ab",
++                "huggingface": "86e3b11ab5475b83ada1f34cae1089aff14eb236e3814fbb42228d517a5c8bb9"
++            }
++        },
++        "service_result": {
++            "certificates": {},
++            "hashes": {
++                "code": {
++                    "code.tar": "fff452eb81453c7be10b69c614b92c5e188848f34c8598f40e575d10c111b027"
++                },
++                "code_build_args": {},
++                "inputs": {},
++                "outputs": {
++                    "linux-headers-6.8.4-rt11-raspi_6.8.4-g75867ff0890f-1_arm64.deb": "44847677ef4ac5ca6a969c4a01e6916c1ee16e229db1bd94425fd0b07b83fc55",
++                    "linux-image-6.8.4-rt11-raspi_6.8.4-g75867ff0890f-1_arm64.deb": "3be2867dc5c37d5f0d95366b953c0ac09d57c421b4c2431753640a6b8e3fd69a",
++                    "linux-libc-dev_6.8.4-g75867ff0890f-1_arm64.deb": "bb0f36344856b78e0b2ff04c67fd4b7d0e6a8a80d482b919a8cb870c73e0e972"
++                }
++            },
++            "power_usage": {
++                "codecarbon": {
++                    "01_uploads": 1.0348831963211275e-05,
++                    "02_preparing_downloading_files": 1.0346642506534456e-05,
++                    "03_preparing_computing_hashes": 1.0347302224132133e-05,
++                    "04_preparing_building_container_image": 0.06753007866698402,
++                    "05_running": 3.928843372484311e-05,
++                    "99_total_power_usage_KWh": 0.06760040987740275
++                }
++            },
++            "timestamp": 1774289172.8759155
++        }
++    },
++    "duet_admin_signature": "WwlI5c+3z+A8bgylXG+grcuba6mc2o38CnSeTaFDPucq5ESmZpAsUtk8urBJB+iy085j3OYiKdhRDJYovNSZ2rm7/ZtTaiSXq8iNj5NwsTR5kNv/5JTTEwpaXXJvZ1yOgWLGjEiSyXa2BSDYUJTNFL3mcncuUFOFxo4rSJlDrZVxEzxkmOqMI2FutFXFcbI1K9zp3OkegCxLY1B2XLjsyLOmtXaeZloq7h/JymYP4V5WcSZHkyBaiqz3p8+ar4nPOsAom8fQaKBsdltHXM2gYE73+bAso2Fjom4KdHnPybIo4EcPbS5zpaxW+ZlgFzl8IlQS7VSBs5NSjZzeSN143UcoyuRMozltW973Ob2CVgc4xUKl6EqVSTr1SnUGA+Ri6jiZscsKNEVFUSo09Ftw81LHDwfHzgRZAyGfGRzSBX50IfxIcQQ1y5wXntXDSyjUydZ0SGue+/aneJISYoBQuKyA/iMSr2Eno2emDDk/bucCJGCUSmoZOTFSQ+kg+NZB8No5HGyIV8KTYw/sCW3Y9VSyJbCtrBrvasx7qW5+MQKZL4NV1Ctuyg+gdcqXyF8AmD6wg7C75RSHargdP0XFJQzQ6fs0NVIitt3PNQ+Tmb8Mrav2NohMEJxnls8htI3BeYxJ4C+hUaCCbBFpUgldCtua8K4I7Oc5qK6387as800="
++}
+diff --git a/harmonia-cactee-verify/tests/verify.rs b/harmonia-cactee-verify/tests/verify.rs
+new file mode 100644
+index 0000000..9406093
+--- /dev/null
++++ b/harmonia-cactee-verify/tests/verify.rs
+@@ -0,0 +1,223 @@
++// nixtee (Othmane Tabiane): tests for the CACTEE certificate verifier.
++use data_encoding::{BASE64, BASE64URL_NOPAD, HEXLOWER};
++use harmonia_cactee_verify::{
++    Azure, Manifest, check_output, jwt, sha256_hex, verify_certificate, verify_for_nar,
++};
++use rsa::pkcs8::{EncodePublicKey, LineEnding};
++use rsa::traits::PublicKeyParts;
++use rsa::{Pkcs1v15Sign, RsaPrivateKey};
++use serde_json::{Value, json};
++use sha2_10::{Digest, Sha256};
++
++fn manifest() -> Manifest {
++    Manifest::from_json(include_str!("data/cactee-manifest.json")).unwrap()
++}
++
++/// Nokia's real sample certificate (Azure SGX quote, Python RSA-PSS signature).
++fn sample() -> Value {
++    serde_json::from_str(include_str!("data/sample-certificate.json")).unwrap()
++}
++
++#[test]
++fn real_sample_certificate_passes_steps_01_to_03() {
++    let r = verify_certificate(&sample(), &manifest(), Azure::Simulated);
++    assert!(r.ok(), "{}", r.failures());
++    assert_eq!(
++        r.summary(),
++        "01_duet_admin_quote=ok 02_controller_signature=ok 03_duet_service_info=ok"
++    );
++}
++
++#[test]
++fn changing_any_signed_field_breaks_the_signature() {
++    let mut c = sample();
++    c["duet_service_result"]["service_result"]["timestamp"] = json!(1774289173.8759155);
++    let r = verify_certificate(&c, &manifest(), Azure::Simulated);
++    assert!(!r.ok());
++    assert_eq!(r.steps[1].name, "02_controller_signature");
++    assert!(!r.steps[1].ok);
++}
++
++#[test]
++fn other_enclave_is_refused() {
++    let mut m = manifest();
++    m.mrenclave = "11".repeat(32);
++    let r = verify_certificate(&sample(), &m, Azure::Simulated);
++    assert!(!r.steps[0].ok);
++    assert!(r.failures().contains("mrenclave"));
++}
++
++#[test]
++fn other_service_code_is_refused() {
++    let mut m = manifest();
++    m.service_info.service_code_hash = "00".repeat(32);
++    let r = verify_certificate(&sample(), &m, Azure::Simulated);
++    assert!(!r.steps[2].ok);
++    assert!(r.failures().contains("service_code_hash"));
++}
++
++#[test]
++fn swapped_public_key_is_refused_by_the_quote() {
++    // Attacker re-signs with its own key: step 02 passes, step 01 must not.
++    let mut c = sample();
++    let mut rng = rand::thread_rng();
++    let key = RsaPrivateKey::new(&mut rng, 2048).unwrap();
++    let pem = key
++        .to_public_key()
++        .to_public_key_pem(LineEnding::LF)
++        .unwrap();
++    let msg = harmonia_cactee_verify::canonical::python_dumps_sorted(&c["duet_service_result"]);
++    let sig = key
++        .sign_with_rng(
++            &mut rng,
++            rsa::Pss::new_with_salt::<Sha256>(256 - 34),
++            &Sha256::digest(msg.as_bytes()),
++        )
++        .unwrap();
++    c["duet_admin_quote"]["public_key"] = json!(pem);
++    c["duet_admin_signature"] = json!(BASE64.encode(&sig));
++    let r = verify_certificate(&c, &manifest(), Azure::Simulated);
++    assert!(r.steps[1].ok, "attacker's own signature is valid");
++    assert!(!r.steps[0].ok, "but the quote does not bind that key");
++    assert!(r.failures().contains("report_data"));
++}
++
++fn with_nar_output(nar_name: &str, nar: &[u8]) -> Value {
++    let mut c = sample();
++    c["duet_service_result"]["service_result"]["hashes"]["outputs"] =
++        json!({ nar_name: sha256_hex(nar) });
++    c
++}
++
++#[test]
++fn output_hash_binds_the_nar() {
++    let name = "pb9q1wnzlzzvlcy5g2p10v66czpmz72f-gnu-config-2024-01-01.nar";
++    let c = with_nar_output(name, b"the nar");
++    assert!(check_output(&c, name, &Sha256::digest(b"the nar")).ok);
++    assert!(!check_output(&c, name, &Sha256::digest(b"another nar")).ok);
++    let other = "abijl898gbkzqwxyc73z1pmnpl3kjx5z-other.nar";
++    assert!(!check_output(&c, other, &Sha256::digest(b"the nar")).ok);
++    // signature no longer matches since outputs changed, so the full check fails
++    assert!(
++        !verify_for_nar(
++            &c,
++            &manifest(),
++            Azure::Simulated,
++            name,
++            &Sha256::digest(b"the nar")
++        )
++        .ok()
++    );
++}
++
++// ---- Azure attestation token, against a local stand-in for Azure's keys
++
++const EP: &str = "https://sharedneu.neu.attest.azure.net";
++
++struct FakeAzure {
++    key: RsaPrivateKey,
++}
++
++impl FakeAzure {
++    fn new() -> Self {
++        FakeAzure {
++            key: RsaPrivateKey::new(&mut rand::thread_rng(), 2048).unwrap(),
++        }
++    }
++    fn jwks(&self) -> Value {
++        let k = self.key.to_public_key();
++        json!({"keys": [{"kty": "RSA", "kid": "k1",
++            "n": BASE64URL_NOPAD.encode(&k.n().to_bytes_be()),
++            "e": BASE64URL_NOPAD.encode(&k.e().to_bytes_be())}]})
++    }
++    fn token(&self, claims: &Value) -> String {
++        let h = BASE64URL_NOPAD.encode(br#"{"alg":"RS256","kid":"k1"}"#);
++        let p = BASE64URL_NOPAD.encode(claims.to_string().as_bytes());
++        let input = format!("{h}.{p}");
++        let sig = self
++            .key
++            .sign(
++                Pkcs1v15Sign::new::<Sha256>(),
++                &Sha256::digest(input.as_bytes()),
++            )
++            .unwrap();
++        format!("{input}.{}", BASE64URL_NOPAD.encode(&sig))
++    }
++}
++
++fn good_claims(c: &Value) -> Value {
++    let quote = BASE64
++        .decode(c["duet_admin_quote"]["quote"].as_str().unwrap().as_bytes())
++        .unwrap();
++    json!({
++        "iss": EP,
++        "sgx-mrenclave": HEXLOWER.encode(&quote[112..144]),
++        "x-ms-sgx-report-data": format!("{}{}", HEXLOWER.encode(&quote[368..400]), "00".repeat(32)),
++        "x-ms-sgx-collateral": {"quotehash": sha256_hex(&quote)},
++    })
++}
++
++#[test]
++fn azure_token_valid_and_tampered() {
++    let az = FakeAzure::new();
++    let jwks = az.jwks();
++    let mut c = sample();
++    let claims = good_claims(&c);
++
++    c["duet_admin_quote"]["jwt"] = json!(az.token(&claims));
++    let r = verify_certificate(&c, &manifest(), Azure::Jwks(&jwks));
++    assert!(r.ok(), "{}", r.failures());
++
++    let mut bad = claims.clone();
++    bad["sgx-mrenclave"] = json!("33".repeat(32));
++    c["duet_admin_quote"]["jwt"] = json!(az.token(&bad));
++    assert!(
++        verify_certificate(&c, &manifest(), Azure::Jwks(&jwks))
++            .failures()
++            .contains("token mrenclave")
++    );
++
++    let mut bad = claims.clone();
++    bad["x-ms-sgx-collateral"]["quotehash"] = json!("44".repeat(32));
++    c["duet_admin_quote"]["jwt"] = json!(az.token(&bad));
++    assert!(
++        verify_certificate(&c, &manifest(), Azure::Jwks(&jwks))
++            .failures()
++            .contains("quote hash")
++    );
++
++    let mut bad = claims.clone();
++    bad["iss"] = json!("https://evil.attest.azure.net");
++    c["duet_admin_quote"]["jwt"] = json!(az.token(&bad));
++    assert!(
++        verify_certificate(&c, &manifest(), Azure::Jwks(&jwks))
++            .failures()
++            .contains("issuer")
++    );
++
++    // signed by someone else
++    let other = FakeAzure::new();
++    c["duet_admin_quote"]["jwt"] = json!(other.token(&claims));
++    assert!(
++        verify_certificate(&c, &manifest(), Azure::Jwks(&jwks))
++            .failures()
++            .contains("signature does not match")
++    );
++
++    // real mode without a token
++    c["duet_admin_quote"].as_object_mut().unwrap().remove("jwt");
++    assert!(
++        verify_certificate(&c, &manifest(), Azure::Jwks(&jwks))
++            .failures()
++            .contains("missing")
++    );
++}
++
++#[test]
++fn attestation_url_must_be_azure() {
++    assert!(jwt::azure_endpoint("https://sharedneu.neu.attest.azure.net").is_ok());
++    assert!(jwt::azure_endpoint("https://evil.example.com").is_err());
++    assert!(jwt::azure_endpoint("http://x.attest.azure.net").is_err());
++    assert!(jwt::azure_endpoint("https://x.attest.azure.net/certs").is_err());
++    assert!(jwt::azure_endpoint("https://user@x.attest.azure.net").is_err());
++}
+diff --git a/harmonia-store-nar-info/src/lib.rs b/harmonia-store-nar-info/src/lib.rs
+index b4890c6..9d23a78 100644
+--- a/harmonia-store-nar-info/src/lib.rs
++++ b/harmonia-store-nar-info/src/lib.rs
+@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
+ use harmonia_store_content_address::ContentAddress;
+ use harmonia_store_path::{StoreDir, StorePath};
+ use harmonia_store_path_info::{
+-    NarHash, StorePathKeyed, UnkeyedValidPathInfo, ValidPathInfo, fingerprint_path,
++    NarHash, CvmAttestation ,StorePathKeyed, UnkeyedValidPathInfo, ValidPathInfo, fingerprint_path,
+ };
+ use harmonia_utils_hash::{Hash, fmt::Base32};
+ use harmonia_utils_signature::{SecretKey, Signature};
+@@ -82,7 +82,7 @@ macro_rules! push_line {
+ }
+ 
+ /// Format a `NarInfo` as the textual narinfo format used by the binary cache protocol.
+-pub fn format_narinfo_txt(store_dir: &StoreDir, narinfo: &NarInfo) -> Vec<u8> {
++pub fn format_narinfo_txt(store_dir: &StoreDir, narinfo: &NarInfo, cvm: Option<&CvmAttestation>,) -> Vec<u8> {
+     use harmonia_utils_hash::HashFormat as _;
+ 
+     let path = &narinfo.path;
+@@ -142,6 +142,17 @@ pub fn format_narinfo_txt(store_dir: &StoreDir, narinfo: &NarInfo) -> Vec<u8> {
+         push_line!(result, b"CA: ", ca.to_string().as_bytes());
+     }
+ 
++    // CVM attestation: supplied out-of-band, not read from the Nix database.
++    if let Some(c) = cvm {
++        push_line!(result, b"CvmAttestationType: ", c.attestation_type.as_bytes());
++        push_line!(result, b"CvmBackend: ", c.backend.as_bytes());
++        push_line!(result, b"CvmQuote: ", c.quote.as_bytes());
++        push_line!(result, b"CvmOutputHash: ", c.output_hash.as_bytes());
++       if !c.input_hashes.is_empty() {
++            push_line!(result, b"CvmInputHashes: ", c.input_hashes.join(" ").as_bytes());
++        }
++    }
++
+     result
+ }
+ 
+diff --git a/harmonia-store-path-info/src/lib.rs b/harmonia-store-path-info/src/lib.rs
+index 966f123..140f3ae 100644
+--- a/harmonia-store-path-info/src/lib.rs
++++ b/harmonia-store-path-info/src/lib.rs
+@@ -92,12 +92,23 @@ pub fn fingerprint_path(
+ 
+     result
+ }
+-
+ /// Serializes in "pure" format, omitting impure fields when they have default values.
+ /// Used for content-addressed paths.
+ #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+ pub struct Pure<T>(pub T);
+ 
++/// CVM attestation attached to a store path.
++/// Not read from the Nix database: supplied out-of-band by the publisher.
++#[derive(Debug, Clone, PartialEq, Eq, Hash)]
++#[cfg_attr(any(test, feature = "test"), derive(Arbitrary))]
++pub struct CvmAttestation {
++    pub attestation_type: String,
++    pub backend: String,
++    pub quote: String,
++    pub output_hash: String,
++    pub input_hashes: Vec<String>,
++}
++
+ #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+ #[cfg_attr(any(test, feature = "test"), derive(Arbitrary))]
+ pub struct UnkeyedValidPathInfo {

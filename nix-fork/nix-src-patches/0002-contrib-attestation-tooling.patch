@@ -1,0 +1,3736 @@
+# © 2026 Nokia
+# Licensed under the MIT License
+# SPDX-License-Identifier: MIT
+
+Subject: [PATCH 2/3] contrib/attestation: certifier, signer, ingest and package-builder tooling
+
+Base:   NixOS/nix 0765ffa540e2adfda7b69efafdbac821ebc48034
+        (master, 2026-09-04, "Merge pull request #16340 from JamieMagee/fuzz/seed-replay")
+Source: nix-tee/nix-fork/nix-src (branch feature/tee-attestation)
+
+Adds the scripts and docs around the fork: post-build certifier, certificate
+signing, NAR ingestion, the Docker-based package builder that compiles the
+fork and builds an attested jo closure, and demo/lab notes. Nothing here is
+part of the Nix build.
+
+Apply with: git apply <patch>   or   patch -p1 < <patch>
+
+Apply from the root of a NixOS/nix checkout at the base commit.
+See README.md next to this file for the file list and caveats.
+---
+ contrib/attestation/AZURE.md                                    |  71 +++++
+ contrib/attestation/DEMO.md                                     |   5 +
+ contrib/attestation/README.md                                   | 107 +++++++
+ contrib/attestation/SETUP.md                                    |  67 ++++
+ contrib/attestation/SPEAKER-SCRIPT.md                           |  24 ++
+ contrib/attestation/TODAY.md                                    |  84 +++++
+ contrib/attestation/binding.py                                  |  95 ++++++
+ contrib/attestation/fix-wsl-symlinks.py                         |  29 ++
+ contrib/attestation/ingest-nars-to-store.py                     | 174 +++++++++++
+ contrib/attestation/nix-attestation-backfill                    | 168 ++++++++++
+ contrib/attestation/nix-attestation-verify                      | 124 ++++++++
+ contrib/attestation/nix-certifier                               | 147 +++++++++
+ contrib/attestation/package-builder/.gitignore                  |   9 +
+ contrib/attestation/package-builder/Dockerfile                  | 102 ++++++
+ contrib/attestation/package-builder/README.md                   |  62 ++++
+ contrib/attestation/package-builder/build.sh                    |  57 ++++
+ contrib/attestation/package-builder/certs/.gitkeep              |   1 +
+ contrib/attestation/package-builder/compile-nix-fork.sh         |  30 ++
+ contrib/attestation/package-builder/export-closure.sh           | 412 +++++++++++++++++++++++++
+ contrib/attestation/package-builder/fix-eol.py                  |  37 +++
+ contrib/attestation/package-builder/fork-build-overlay.nix      |  57 ++++
+ contrib/attestation/package-builder/fork-nixpkgs/default.nix    |  11 +
+ contrib/attestation/package-builder/gen-package-nix.sh          |  51 +++
+ contrib/attestation/package-builder/gnu-mirror-overlay.nix      | 146 +++++++++
+ contrib/attestation/package-builder/jo.nix                      |  31 ++
+ contrib/attestation/package-builder/nix-docker.conf             |  26 ++
+ contrib/attestation/package-builder/nix-fork-classic.nix        | 121 ++++++++
+ contrib/attestation/package-builder/nixpkgs-with-overlay.nix    |   5 +
+ contrib/attestation/package-builder/nokia-runner/.gitignore     |   4 +
+ contrib/attestation/package-builder/nokia-runner/Dockerfile     |  57 ++++
+ .../attestation/package-builder/packages/bash-completion.nix    |   4 +
+ contrib/attestation/package-builder/packages/bash.nix           |   4 +
+ contrib/attestation/package-builder/packages/build-order.txt    |   7 +
+ contrib/attestation/package-builder/packages/gcc-cc-lib.nix     |   4 +
+ contrib/attestation/package-builder/packages/glibc.nix          |   4 +
+ contrib/attestation/package-builder/packages/ncurses.nix        |   4 +
+ contrib/attestation/package-builder/packages/readline.nix       |   4 +
+ contrib/attestation/package-builder/packages/runtime-attrs.txt  |  15 +
+ contrib/attestation/package-builder/packages/tzdata.nix         |   4 +
+ contrib/attestation/package-builder/prefetch.sh                 | 461 ++++++++++++++++++++++++++++
+ contrib/attestation/package-builder/restore-symlinks.sh         |  47 +++
+ contrib/attestation/package-builder/setup-ca-bundle.sh          |  48 +++
+ contrib/attestation/package-builder/stage-nokia-runner.sh       |  51 +++
+ contrib/attestation/package-builder/sync-nix-cache.sh           |  47 +++
+ contrib/attestation/push-exports-to-harmonia.py                 |  13 +
+ contrib/attestation/push-exports-to-harmonia.sh                 |   5 +
+ contrib/attestation/sign-attestation-certs.py                   | 104 +++++++
+ contrib/attestation/slides.html                                 | 190 ++++++++++++
+ 48 files changed, 3330 insertions(+)
+ create mode 100644 contrib/attestation/AZURE.md
+ create mode 100644 contrib/attestation/DEMO.md
+ create mode 100644 contrib/attestation/README.md
+ create mode 100644 contrib/attestation/SETUP.md
+ create mode 100644 contrib/attestation/SPEAKER-SCRIPT.md
+ create mode 100644 contrib/attestation/TODAY.md
+ create mode 100755 contrib/attestation/binding.py
+ create mode 100755 contrib/attestation/fix-wsl-symlinks.py
+ create mode 100755 contrib/attestation/ingest-nars-to-store.py
+ create mode 100755 contrib/attestation/nix-attestation-backfill
+ create mode 100755 contrib/attestation/nix-attestation-verify
+ create mode 100755 contrib/attestation/nix-certifier
+ create mode 100644 contrib/attestation/package-builder/.gitignore
+ create mode 100644 contrib/attestation/package-builder/Dockerfile
+ create mode 100644 contrib/attestation/package-builder/README.md
+ create mode 100755 contrib/attestation/package-builder/build.sh
+ create mode 100644 contrib/attestation/package-builder/certs/.gitkeep
+ create mode 100755 contrib/attestation/package-builder/compile-nix-fork.sh
+ create mode 100755 contrib/attestation/package-builder/export-closure.sh
+ create mode 100755 contrib/attestation/package-builder/fix-eol.py
+ create mode 100644 contrib/attestation/package-builder/fork-build-overlay.nix
+ create mode 100644 contrib/attestation/package-builder/fork-nixpkgs/default.nix
+ create mode 100755 contrib/attestation/package-builder/gen-package-nix.sh
+ create mode 100644 contrib/attestation/package-builder/gnu-mirror-overlay.nix
+ create mode 100644 contrib/attestation/package-builder/jo.nix
+ create mode 100644 contrib/attestation/package-builder/nix-docker.conf
+ create mode 100644 contrib/attestation/package-builder/nix-fork-classic.nix
+ create mode 100644 contrib/attestation/package-builder/nixpkgs-with-overlay.nix
+ create mode 100644 contrib/attestation/package-builder/nokia-runner/.gitignore
+ create mode 100644 contrib/attestation/package-builder/nokia-runner/Dockerfile
+ create mode 100644 contrib/attestation/package-builder/packages/bash-completion.nix
+ create mode 100644 contrib/attestation/package-builder/packages/bash.nix
+ create mode 100644 contrib/attestation/package-builder/packages/build-order.txt
+ create mode 100644 contrib/attestation/package-builder/packages/gcc-cc-lib.nix
+ create mode 100644 contrib/attestation/package-builder/packages/glibc.nix
+ create mode 100644 contrib/attestation/package-builder/packages/ncurses.nix
+ create mode 100644 contrib/attestation/package-builder/packages/readline.nix
+ create mode 100644 contrib/attestation/package-builder/packages/runtime-attrs.txt
+ create mode 100644 contrib/attestation/package-builder/packages/tzdata.nix
+ create mode 100755 contrib/attestation/package-builder/prefetch.sh
+ create mode 100755 contrib/attestation/package-builder/restore-symlinks.sh
+ create mode 100755 contrib/attestation/package-builder/setup-ca-bundle.sh
+ create mode 100755 contrib/attestation/package-builder/stage-nokia-runner.sh
+ create mode 100755 contrib/attestation/package-builder/sync-nix-cache.sh
+ create mode 100755 contrib/attestation/push-exports-to-harmonia.py
+ create mode 100755 contrib/attestation/push-exports-to-harmonia.sh
+ create mode 100755 contrib/attestation/sign-attestation-certs.py
+ create mode 100644 contrib/attestation/slides.html
+
+diff --git a/contrib/attestation/AZURE.md b/contrib/attestation/AZURE.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..2646c34a70325745f0016e3385c34c17e0d3c6f7
+--- /dev/null
++++ b/contrib/attestation/AZURE.md
+@@ -0,0 +1,71 @@
++# Azure / lab reproduce
++
++This tree is meant to rebuild the attested `jo` path and the client verify flow
++on a fresh VM. Do **not** commit `cache.secret`. Generate keys on the VM.
++
++## Repos
++
++| Repo | Branch | Role |
++|------|--------|------|
++| this Nix fork | `feature/tee-attestation` | libstore verify, `contrib/attestation/*` |
++| `../harmonia` | `feature/attestation-sidecars` | HTTP cache; 404 without json+sig |
++
++Copy `contrib/attestation/package-builder/` onto the builder VM. Build with `./build.sh` (targets `nix-tee-base` and `package-builder`). Package+overlays image is `nokia-runner/Dockerfile`.
++
++## Keys (generate on Azure, do not copy secrets)
++
++```bash
++nix-store --generate-binary-cache-key harmonia-1 ./cache.secret ./cache.pub
++# Harmonia host (narinfo Sig):
++nix-store --generate-binary-cache-key cache.local-1 ./harmonia.secret ./harmonia.pub
++```
++
++Client `trusted-public-keys` must list **both** public keys.
++
++## Builder
++
++1. Compile this fork (`meson`/`ninja`) or use `nix-tee-base` Docker.
++2. `substitute = false`. Overlays: `gnu-mirror-overlay.nix`, `packages/`, `vendor/jo-src`.
++3. `nix-build jo.nix` with `ATTESTATION_STUB_MODE=1` and `post-build-hook` = `nix-certifier`.
++4. Sign sidecars:
++
++```bash
++python3 contrib/attestation/sign-attestation-certs.py \
++  --secret-key ./cache.secret \
++  /path/to/export-outputs
++```
++
++5. Copy closure + sidecars to Harmonia with **this** fork:
++
++```bash
++nix copy --to 'ssh://USER@HARMONIA?remote-program=/path/to/nix-store-serve' \
++  --option attestation-harmonia-dir /path/to/certificates/harmonia \
++  /nix/store/…-jo-1.7
++```
++
++Use `ssh://`, not `ssh-ng://`. Remote serve must be protocol **2.9**.
++
++## Harmonia
++
++- Bind `0.0.0.0:5000`.
++- `attestation_dir` = directory of `{hashPart}.attestation.json` + `.sig`.
++- `require_attestation_sidecars = true`.
++- `sign_key_paths` = `harmonia.secret` (`cache.local-1`).
++
++## Client
++
++- Fork `nix` 2.36 (not installer 2.35) for `attestation:` logs.
++- `substituters` / `trusted-substituters` = Harmonia HTTP only.
++- Stop `nix-daemon.socket` for local-store copy, or the dest is `daemon` and sidecars are rejected.
++- `LD_LIBRARY_PATH=$prefix/lib/x86_64-linux-gnu`.
++- Wipe `{hashPart}` **and** `sha256-*.json` under `attestation-store` before a clean run.
++
++```bash
++nix copy --from http://HARMONIA:5000 /nix/store/…-jo-1.7
++# then
++…/bin/jo -a 1 2 3
++```
++
++## What not to put in git
++
++`cache.secret`, `harmonia.secret`, CA private keys, `/nix/store` dumps, export NAR trees.
+diff --git a/contrib/attestation/DEMO.md b/contrib/attestation/DEMO.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..e08fdbe11b532cc89a291a5ec37c0749241f153c
+--- /dev/null
++++ b/contrib/attestation/DEMO.md
+@@ -0,0 +1,5 @@
++# Demo
++
++Slides: `contrib/attestation/slides.html` (demo only). Script: `SPEAKER-SCRIPT.md`.
++
++Client: stop `nix-daemon.socket` and `nix-daemon.service`. Use fork `~/nix-prefix`, not installer nix. No nix-shell/flakes.
+diff --git a/contrib/attestation/README.md b/contrib/attestation/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..9807abf6027dfc42a9d45986f103d3af694e5687
+--- /dev/null
++++ b/contrib/attestation/README.md
+@@ -0,0 +1,107 @@
++# Nix TEE Attestation
++
++Hardware-attested builds for Nix: every derivation output carries a
++binding record v1 certificate, and builds refuse to start unless every
++direct input is attested (or bootstrapped).
++
++## Binding record v1
++
++```json
++{
++  "version": 1,
++  "drv": "/nix/store/....drv",
++  "outputs": { "out": "sha256-..." },
++  "inputs": ["sha256-...", "sha256-..."],
++  "binding": "sha256-...",
++  "attestation": { "type": "tdx", "quote": "<base64>" }
++}
++```
++
++Certificates are stored as `<output-nar-hash-sri>.json` in
++`attestation-store`.
++
++## Nix configuration
++
++```ini
++require-attestation = true
++substitute = false
++attestation-store = /var/lib/nix-attestations
++attestation-verifier = /usr/local/bin/nix-attestation-verify
++post-build-hook = /usr/local/bin/nix-certifier
++attestation-bootstrap-inputs = sha256-... sha256-...
++```
++
++## Bootstrap inputs
++
++The first compiler cannot be attested. Pin and pre-seed:
++
++```bash
++nix-store --add-fixed sha256 bootstrap-tools.tar.xz
++chmod +x busybox && nix-store --add-fixed --recursive sha256 busybox
++```
++
++Add their NAR hashes to `attestation-bootstrap-inputs`.
++
++## Development (stub mode)
++
++Without TDX hardware:
++
++```bash
++export ATTESTATION_STUB_MODE=1
++```
++
++## Binary cache sidecars
++
++Substituters fetch `{hashPart}.attestation.json` and `{hashPart}.attestation.sig`
++(same 32-character hash as `{hashPart}.narinfo`).
++
++`nix-copy-closure` over `ssh://` (serve protocol 2.9) sends those two files
++**before** the NAR. Missing local sidecars or a remote serve older than 2.9
++is an error (`attestation-require-sidecar-on-copy`, default true); the NAR
++is not sent. The remote `nix-store --serve --write` verifies the
++Ed25519 cache signature (`trusted-public-keys`, fingerprint
++`attestation:1;<store-path>;<narHash-SRI>;<sha256 of JSON>`) and the
++binding record. Only then is the sidecar written and the NAR imported.
++With `require-attestation = true` on the receiver, a NAR without a
++prior verified sidecar is rejected (except bootstrap hashes).
++
++Receive-side `nix.conf` (Harmonia host), later HTTP ingest can reuse the same
++keys:
++
++```ini
++require-attestation = true
++attestation-require-cache-signature = true
++attestation-harmonia-dir = /var/lib/harmonia-attest
++trusted-public-keys = harmonia-1:BASE64...
++attestation-bootstrap-inputs = sha256-...
++```
++
++Both machines need this fork’s `nix-store`. Stock Nix advertises serve 2.8
++and the sidecar is skipped.
++
++Patched Harmonia (`C:\nixDocs\freshNix\harmonia`, or the WSL clone) serves
++`/{hash}.attestation.json` and `/{hash}.attestation.sig` from
++`attestation_dir` (default `/var/lib/harmonia-attest`) on the **same**
++substituter URL as `.narinfo` / NAR. No nginx path split.
++
++If NARs live under `outputs/nars/` (not yet in the local Nix store),
++register **every** path in that export (`index.json` `packages`, any
++root — not hardcoded to one package), then copy that export's `root`
++closure:
++
++```bash
++python3 contrib/attestation/ingest-nars-to-store.py \
++  --outputs ~/dev_test_docker/test_temp/tmp/outputs \
++  --nix-store ~/nixfresh/nix/outputs/out/bin/nix-store \
++  --copy-to ssh://harmoniatest@<22.04-IP>
++```
++
++`nix-store --import-nar` writes `{hashPart}.attestation.json` + `.sig` next
++to the valid path. `nix-copy-closure` over `ssh://` (serve 2.9) sends those
++files before each NAR. The Harmonia host must run this fork's
++`nix-store --serve --write` (stock 2.8 skips sidecars). Harmonia then
++serves both from the store + `attestation-harmonia-dir`.
++
++## Docker
++
++See `docker/` for the two-layer image build (`nix-tee-base` + package builder).
+diff --git a/contrib/attestation/SETUP.md b/contrib/attestation/SETUP.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a13ddf677b596865910e0f3e2548d49228b36b0
+--- /dev/null
++++ b/contrib/attestation/SETUP.md
+@@ -0,0 +1,67 @@
++# TEE Attestation Setup Guide
++
++## Architecture
++
++```
++Build completes → post-build-hook (nix-certifier) → certificate JSON
++Next build starts → libstore checks direct inputs → certificate required
++Bootstrap inputs → pinned NAR hashes in nix.conf (no certificate)
++```
++
++## File map
++
++| File | Role |
++|------|------|
++| `src/libstore/attestation.cc` | Pre-build verification in Nix |
++| `src/libstore/include/nix/store/attestation-settings.hh` | nix.conf options |
++| `src/libstore/build/derivation-building-goal.cc` | Calls verify before build |
++| `contrib/attestation/nix-certifier` | Post-build certificate creator |
++| `contrib/attestation/nix-attestation-verify` | External quote verifier |
++| `contrib/attestation/binding.py` | Shared binding digest v1 |
++
++## nix.conf
++
++```ini
++require-attestation = true
++substitute = false
++attestation-store = /var/lib/nix-attestations
++attestation-verifier = /usr/local/bin/nix-attestation-verify
++post-build-hook = /usr/local/bin/nix-certifier
++attestation-bootstrap-inputs = sha256-... sha256-...
++```
++
++Dev without TDX hardware:
++
++```bash
++export ATTESTATION_STUB_MODE=1
++```
++
++## Docker package-builder layout
++
++```
++contrib/attestation/package-builder/
++├── Dockerfile              # stages: nix-tee-prep, nix-tee-base, package-builder
++├── build.sh
++├── nokia-runner/Dockerfile # FROM nix-tee-base; overlays + packages/*.nix
++├── nix-docker.conf
++├── jo.nix, overlays, vendor/, packages/
++└── stage-nokia-runner.sh
++```
++
++Fork source is `--build-context nixsrc=…` (see `build.sh`), not a `nix-src/` copy in this folder.
++
++## Build order
++
++1. `NIX_SRC=/path/to/fork ./build.sh nix-tee-base nix-tee-base`
++2. `NIX_SRC=/path/to/fork ./build.sh package-builder nix-jo-builder`
++3. Optional: `./stage-nokia-runner.sh` then Nokia `test_docker.py` (second image)
++
++## Bootstrap
++
++```bash
++nix-store --add-fixed sha256 bootstrap-tools.tar.xz
++chmod +x busybox && nix-store --add-fixed --recursive sha256 busybox
++nix path-info --json <path> | jq '.[0].narHash'
++```
++
++Add hashes to `attestation-bootstrap-inputs`.
+diff --git a/contrib/attestation/SPEAKER-SCRIPT.md b/contrib/attestation/SPEAKER-SCRIPT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ca5efd6b43095f69d36278fcbb7685cdccff8a4a
+--- /dev/null
++++ b/contrib/attestation/SPEAKER-SCRIPT.md
+@@ -0,0 +1,24 @@
++# Demo script (10 slides)
++
++`slides.html` — `N` hides blue/gold boxes.
++
++**1** Built overlay jo, signed sidecars, Harmonia serves, fork verifies then copies. Live: curl, nix copy, jo.  
++*Bolo:* jo, sign, cache, client verify. Live copy.
++
++**2** Builder 24.04, Harmonia :5000, client fork. Two keys: cache.local-1 narinfo, harmonia-1 cert. Both on client.
++
++**3** `./build.sh nix-tee-base` then nokia-runner + test_docker.py, then sign/push. Not rebuilding. Not the failed package-builder target.
++
++**4** Path `i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7`. Same hashPart for narinfo/json/sig. No flake/nix-shell.
++
++**5** curl cache-info, narinfo (Sig cache.local-1), json+sig 200.
++
++**6** Stop daemon+socket. Fork nix copy, both keys, stub mode.
++
++**7** Log: fetched json/sig → verified → copying path. Wrong order = stop.
++
++**8** `jo -a 1 2 3` → `[1,2,3]`
++
++**9** Optional: hide .sig, copy fails, restore.
++
++**10** Client refuses NAR without builder signature. Stub quotes / not stock daemon — one line only.
+diff --git a/contrib/attestation/TODAY.md b/contrib/attestation/TODAY.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1be99ecbef905a961da9e38a28c7e2b73116f88
+--- /dev/null
++++ b/contrib/attestation/TODAY.md
+@@ -0,0 +1,84 @@
++# 2026-09-14 — client substitute lab (issues)
++
++End-to-end: builder 24.04 attested `jo` → Harmonia 22.04 `:5000` → nixclient fork `nix copy --from http://…`.
++
++`jo` store path used:
++
++`/nix/store/i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7`
++
++## What worked by the end
++
++Fork 2.36 on the client fetched `{hashPart}.attestation.json` + `.sig` from Harmonia, verified under `harmonia-1`, then copied NARs. `jo -a 1 2 3` ran from the store path.
++
++## Issues (in order)
++
++### 1. Stock Nix / `nix-shell` is the wrong test
++
++Installer Nix (~2.35) has no attestation in libstore. `cd ~/nix && nix-shell` asked flake/nixpkgs hashes that Harmonia did not have (404), then source-bootstrap.
++
++**Do:** `nix copy --from http://Harmonia $joPath` with the **fork** binary.
++
++### 2. `PUT_HARMONIA_PUB_HERE`
++
++Template key in an earlier `nix.conf`. File was later fixed; **nix-daemon** had started *before* the file change, so the daemon still parsed the placeholder.
++
++**Fix:** valid `trusted-public-keys`, then `systemctl restart nix-daemon`. `grep` on the file can be empty while the daemon is stale.
++
++### 3. `sudo nix`: command not found / dest `daemon`
++
++`sudo` ignores `PATH`. Use `/home/…/nix-prefix/bin/nix`.
++
++`nix copy --from http` with the daemon as destination: `destination 'daemon' does not accept attestation.json`. Serve 2.9 / local store / binary cache only.
++
++**Fix:** `systemctl stop nix-daemon.socket` **and** `nix-daemon.service` (socket would restart the daemon). `sudo NIX_REMOTE=` + full path to fork `nix`.
++
++`nix-daemon.socket` on 22.04 Harmonia host / client will auto-start the daemon on connect.
++
++### 4. Two keys
++
++| Key | Use |
++|-----|-----|
++| `cache.local-1` | Harmonia **narinfo** `Sig:` |
++| `harmonia-1` | `{hash}.attestation.sig` (builder `cache.secret`) |
++
++Both must be in client `trusted-public-keys`. Same key on every cert does **not** mean every fingerprint matches.
++
++### 5. Fingerprint is a string
++
++```
++attestation:1;<storePath>;<narHash-SRI>;<sha256-SRI of JSON bytes>
++```
++
++JSON bytes, or narHash written as nix32 vs SRI, must match what was signed. `0sjjj9z1…` (nix32) and `sha256-pQpat…` (SRI) are the **same** empty-NAR hash.
++
++### 6. Shared SRI cert file (the long failure on `gnutar-get-version`)
++
++Empty directories all have NAR hash `sha256-pQpat…`. Libstore saved certs as `attestation-store/sha256-pQpat….json`. The first empty path won; `04skv4…-gnutar-get-version` reused **another path’s** JSON. Logs had no `fetched '04skv4….json'`.
++
++`sudo rm ~/nix-attestations` as root clears `/root/…`, not `/home/nixclient/nix-attestations` or `sha256-*` names (`*04skv4*` misses them).
++
++**Fix in tree:** `nix copy --from http://` always GET `{hashPart}.attestation.json`; do not fall back to the shared SRI filename.
++
++### 7. `nix-store --delete --ignore-liveness`
++
++The daemon **never** allows ignore-liveness (`you are not allowed` / still-alive via referrers). `jo`/stdenv keep `gnutar-get-version` alive. Deleting that path is not required for the client demo if Harmonia already has the NAR + sidecar.
++
++### 8. Harmonia `scp …:harmonia-attest/`
++
++Relative path is `$HOME/harmonia-attest`. Must match `attestation_dir` in `harmonia.toml` (it did: `/home/harmoniatest/harmonia-attest`). Rsync **all** 1174 pairs, not one hash.
++
++### 9. Meson on the client
++
++Need `meson >= 1.8`, `libgit2-dev`, `cmake`+`libtoml11-dev`, `-Dlibcmd:readline-flavor=readline` (`libeditline-dev` missing). Libs install to `lib/x86_64-linux-gnu`, not `lib/`. Forward-declare `verifyInputCertificate`.
++
++## Commands that are *not* the demo
++
++- `nix-shell` in the Nix checkout
++- Stock `nix copy` without the fork
++- `ssh-ng://` (no PutAttestation)
++
++## Demo files
++
++- `contrib/attestation/DEMO.md`
++- `contrib/attestation/slides.html`
++- `contrib/attestation/AZURE.md`
+diff --git a/contrib/attestation/binding.py b/contrib/attestation/binding.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..9fcc7d875d6c2b2efbabaf649ccde7797a7feeaa
+--- /dev/null
++++ b/contrib/attestation/binding.py
+@@ -0,0 +1,95 @@
++#!/usr/bin/env python3
++"""Shared binding record v1 computation for Nix TEE attestation."""
++
++from __future__ import annotations
++
++import hashlib
++import json
++from typing import Dict, List
++
++
++def compute_binding(drv: str, inputs: List[str], outputs: Dict[str, str]) -> str:
++    """Compute the binding digest (SRI sha256) for a binding record v1."""
++    sorted_inputs = sorted(inputs)
++    sorted_outputs = sorted(f"{k}={v}" for k, v in outputs.items())
++    payload = (
++        "version=1\n"
++        f"drv={drv}\n"
++        f"inputs={','.join(sorted_inputs)}\n"
++        f"outputs={','.join(sorted_outputs)}\n"
++    )
++    digest = hashlib.sha256(payload.encode("utf-8")).digest()
++    return "sha256-" + _b64encode(digest)
++
++
++def _b64encode(data: bytes) -> str:
++    """Base64 with padding, matching Nix's SRI output.
++
++    Nix's Hash::to_string(HashFormat::SRI) keeps the '=' padding, so stripping
++    it here would make every certificate's binding digest disagree with the
++    digest libstore recomputes in validateCertificateStructure.
++    """
++    import base64
++
++    return base64.b64encode(data).decode("ascii")
++
++
++def make_certificate(
++    drv: str,
++    inputs: List[str],
++    outputs: Dict[str, str],
++    quote_b64: str,
++    attestation_type: str = "tdx",
++) -> dict:
++    """Build a complete binding record v1 certificate."""
++    sorted_inputs = sorted(inputs)
++    binding = compute_binding(drv, sorted_inputs, outputs)
++    return {
++        "version": 1,
++        "drv": drv,
++        "outputs": outputs,
++        "inputs": sorted_inputs,
++        "binding": binding,
++        "attestation": {"type": attestation_type, "quote": quote_b64},
++    }
++
++
++def validate_certificate(cert: dict, expected_output_hash: str) -> None:
++    """Structural validation of a binding record v1 certificate."""
++    if cert.get("version") != 1:
++        raise ValueError("invalid or missing version")
++    if "binding" not in cert:
++        raise ValueError("missing binding")
++    if not isinstance(cert.get("inputs"), list):
++        raise ValueError("missing inputs array")
++    if not isinstance(cert.get("outputs"), dict):
++        raise ValueError("missing outputs object")
++    if not isinstance(cert.get("attestation"), dict):
++        raise ValueError("missing attestation object")
++
++    expected_binding = compute_binding(
++        cert["drv"],
++        cert["inputs"],
++        cert["outputs"],
++    )
++    if cert["binding"] != expected_binding:
++        raise ValueError(
++            f"binding mismatch: expected {expected_binding}, got {cert['binding']}"
++        )
++
++    if expected_output_hash not in cert["outputs"].values():
++        raise ValueError(
++            f"output hash {expected_output_hash} not found in certificate outputs"
++        )
++
++
++def write_certificate(cert: dict, store_dir: str, output_hash: str) -> str:
++    """Write certificate to attestation store, return path."""
++    import os
++
++    os.makedirs(store_dir, exist_ok=True)
++    path = os.path.join(store_dir, f"{output_hash}.json")
++    with open(path, "w", encoding="utf-8") as f:
++        json.dump(cert, f, indent=2, sort_keys=True)
++        f.write("\n")
++    return path
+diff --git a/contrib/attestation/fix-wsl-symlinks.py b/contrib/attestation/fix-wsl-symlinks.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..7e855b8d7ae8da4eb673021ac855e54de9b4684c
+--- /dev/null
++++ b/contrib/attestation/fix-wsl-symlinks.py
+@@ -0,0 +1,29 @@
++#!/usr/bin/env python3
++import os
++import sys
++
++repo = sys.argv[1] if len(sys.argv) > 1 else "."
++SKIP = {".git", "build", "outputs", "result"}
++n = 0
++for root, dirs, files in os.walk(repo):
++    dirs[:] = [d for d in dirs if d not in SKIP]
++    for name in files:
++        path = os.path.join(root, name)
++        try:
++            if os.path.islink(path) or os.path.getsize(path) > 256:
++                continue
++            text = open(path, "rb").read().decode("utf-8").strip().replace("\\", "/")
++        except OSError:
++            continue
++        except UnicodeDecodeError:
++            continue
++        if not text.startswith("../") or "\n" in text:
++            continue
++        dest = os.path.normpath(os.path.join(os.path.dirname(path), text))
++        if not os.path.exists(dest):
++            continue
++        os.remove(path)
++        os.symlink(text, path)
++        print("symlink", os.path.relpath(path, repo), "->", text)
++        n += 1
++print("fixed", n, "symlinks")
+diff --git a/contrib/attestation/ingest-nars-to-store.py b/contrib/attestation/ingest-nars-to-store.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..87c0afa3881ad39dd12146085565eff1a496c929
+--- /dev/null
++++ b/contrib/attestation/ingest-nars-to-store.py
+@@ -0,0 +1,174 @@
++#!/usr/bin/env python3
++"""Register every NAR in an export tree into the local Nix store and bind cert+sig.
++
++Package-agnostic: walks index.json `packages` (leaves-first). The export
++`root` (jo, hello, gcc, …) is only used if you pass --copy-to.
++
++  python3 ingest-nars-to-store.py --outputs /path/to/outputs \\
++      --nix-store /path/to/fork/nix-store \\
++      --copy-to ssh://user@harmonia-host
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import os
++import subprocess
++import sys
++from pathlib import Path
++
++
++def nix_env(nix_store: str) -> dict[str, str]:
++    """Prefix-install has no RPATH; libs live in <prefix>/lib."""
++    env = os.environ.copy()
++    lib = str(Path(nix_store).resolve().parent.parent / "lib")
++    prev = env.get("LD_LIBRARY_PATH", "")
++    env["LD_LIBRARY_PATH"] = lib if not prev else lib + ":" + prev
++    return env
++
++
++def valid_store_path(p: str) -> bool:
++    return isinstance(p, str) and p.startswith("/nix/store/") and len(Path(p).name) > 32
++
++
++def load_pub_key(path: Path) -> str:
++    return path.expanduser().read_text(encoding="utf-8").strip().splitlines()[0]
++
++
++def nix_store_prefix(args: argparse.Namespace, cache_pub: str) -> list[str]:
++    home = Path.home()
++    store_dir = args.attestation_store or str(home / "nix-attestations")
++    harmonia_dir = args.attestation_harmonia_dir or str(home / "harmonia-attest")
++    Path(store_dir).mkdir(parents=True, exist_ok=True)
++    Path(harmonia_dir).mkdir(parents=True, exist_ok=True)
++    cmd = [args.nix_store]
++    if cache_pub:
++        cmd += ["--option", "extra-trusted-public-keys", cache_pub]
++    cmd += [
++        "--option",
++        "attestation-store",
++        store_dir,
++        "--option",
++        "attestation-harmonia-dir",
++        harmonia_dir,
++    ]
++    return cmd
++
++
++def main() -> int:
++    p = argparse.ArgumentParser(
++        description="Import all attested NARs from an export dir, then optionally copy-closure the export root."
++    )
++    p.add_argument(
++        "--outputs",
++        type=Path,
++        required=True,
++        help="Export root with index.json, packages/, nars/, certificates/harmonia/",
++    )
++    p.add_argument(
++        "--nix-store",
++        default=os.environ.get("NIX_STORE", "nix-store"),
++        help="Forked nix-store with --import-nar",
++    )
++    p.add_argument(
++        "--root",
++        default="",
++        help="Store path to copy-closure (default: index.json \"root\")",
++    )
++    p.add_argument(
++        "--copy-to",
++        default="",
++        help="nix-copy-closure destination, e.g. ssh://user@host",
++    )
++    p.add_argument("--dry-run", action="store_true")
++    p.add_argument(
++        "--cache-pub",
++        type=Path,
++        default=Path(__file__).resolve().parent / "cache.pub",
++        help="Ed25519 public key that signed certificates/harmonia/*.sig",
++    )
++    p.add_argument("--attestation-store", default="")
++    p.add_argument("--attestation-harmonia-dir", default="")
++    args = p.parse_args()
++    outputs = args.outputs.expanduser().resolve()
++    index_path = outputs / "index.json"
++    if not index_path.is_file():
++        print(f"no index.json at {index_path}", file=sys.stderr)
++        return 1
++    index = json.loads(index_path.read_text(encoding="utf-8"))
++    cache_pub = ""
++    if args.cache_pub.is_file():
++        cache_pub = load_pub_key(args.cache_pub)
++        print(f"using extra-trusted-public-keys {cache_pub}", flush=True)
++    else:
++        print(
++            f"warning: no cache.pub at {args.cache_pub}; "
++            "signature check needs extra-trusted-public-keys",
++            file=sys.stderr,
++        )
++    prefix = nix_store_prefix(args, cache_pub)
++    certs = outputs / "certificates" / "harmonia"
++    names = index.get("packages") or []
++    n = 0
++    skipped = 0
++    for pkg in names:
++        man_path = outputs / "packages" / pkg / "manifest.json"
++        if not man_path.is_file():
++            skipped += 1
++            continue
++        man = json.loads(man_path.read_text(encoding="utf-8"))
++        if man.get("kind") != "nar":
++            skipped += 1
++            continue
++        store_path = man["storePath"]
++        hp = Path(store_path).name[:32]
++        json_p = certs / f"{hp}.attestation.json"
++        sig_p = certs / f"{hp}.attestation.sig"
++        nar = outputs / man["narFile"]
++        if not nar.is_file() or not json_p.is_file() or not sig_p.is_file():
++            print(f"skip (missing nar or sidecar): {pkg}", file=sys.stderr)
++            skipped += 1
++            continue
++        cmd = prefix + [
++            "--import-nar",
++            store_path,
++            str(nar),
++            "--nar-hash",
++            man["narHash"],
++            "--attestation-json",
++            str(json_p),
++            "--attestation-sig",
++            str(sig_p),
++        ]
++        drv = man.get("drvPath")
++        if valid_store_path(drv or ""):
++            cmd += ["--deriver", drv]
++        for dep in man.get("directInputs") or []:
++            sp = dep.get("storePath") if isinstance(dep, dict) else None
++            if valid_store_path(sp or ""):
++                cmd += ["--references", sp]
++        print("+", " ".join(cmd), flush=True)
++        if not args.dry_run:
++            subprocess.run(cmd, check=True, env=nix_env(args.nix_store))
++        n += 1
++
++    root = args.root or index.get("root") or ""
++    print(f"imported {n} paths ({skipped} skipped); export root: {root or '(none)'}")
++    if not args.copy_to:
++        if root:
++            print(f"  nix-copy-closure --to ssh://USER@HOST {root}")
++        return 0
++    if not root:
++        print("--copy-to needs index.json \"root\" or --root", file=sys.stderr)
++        return 1
++    copy_bin = str(Path(args.nix_store).resolve().parent / "nix-copy-closure")
++    copy = [copy_bin, "--to", args.copy_to, root]
++    print("+", " ".join(copy), flush=True)
++    if not args.dry_run:
++        subprocess.run(copy, check=True, env=nix_env(args.nix_store))
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/contrib/attestation/nix-attestation-backfill b/contrib/attestation/nix-attestation-backfill
+new file mode 100755
+index 0000000000000000000000000000000000000000..87782e17480020f7c71cb0efe1628e9ef7aba564
+--- /dev/null
++++ b/contrib/attestation/nix-attestation-backfill
+@@ -0,0 +1,168 @@
++#!/usr/bin/env python3
++"""
++Mint certificates for an already-built closure, so require-attestation can be
++switched on without rejecting everything.
++
++Certificates are normally produced by the post-build-hook as each derivation is
++built. A store populated before attestation was enabled therefore has none, and
++because verifyDirectInputAttestations demands a certificate for every direct
++input, the first enforced build fails on inputs that are perfectly fine. This
++walks an existing closure and writes the certificates that the hook would have
++written.
++
++Paths with no deriver (added with nix-store --add-fixed, e.g. bootstrap-tools
++and busybox) cannot be certified, because there is no derivation to bind to.
++Those are reported as bootstrap NAR hashes for attestation-bootstrap-inputs.
++
++Usage:
++  nix-attestation-backfill /path/to/result [more paths...]
++  ATTESTATION_STORE=/var/lib/nix-attestations \
++  ATTESTATION_STUB_MODE=1 nix-attestation-backfill /result
++"""
++
++from __future__ import annotations
++
++import base64
++import collections
++import json
++import os
++import subprocess
++import sys
++
++from binding import compute_binding, make_certificate, write_certificate
++
++NIX_FLAGS = ["--extra-experimental-features", "nix-command"]
++
++
++def run(cmd: list[str]) -> str:
++    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
++    return result.stdout.strip()
++
++
++def try_run(cmd: list[str]) -> str | None:
++    try:
++        return run(cmd)
++    except subprocess.CalledProcessError:
++        return None
++
++
++def nar_hash_sri(store_path: str) -> str:
++    info = json.loads(run(["nix", *NIX_FLAGS, "path-info", "--json", store_path]))
++    if isinstance(info, dict):
++        return info[store_path]["narHash"]
++    return info[0]["narHash"]
++
++
++def derivation_show(drv_path: str) -> dict:
++    raw = run(["nix", *NIX_FLAGS, "derivation", "show", drv_path])
++    return json.loads(raw)[drv_path]
++
++
++def direct_input_paths(drv_path: str) -> list[str]:
++    """Same set libstore checks: inputSrcs plus the consumed input outputs."""
++    data = derivation_show(drv_path)
++    paths: list[str] = list(data.get("inputSrcs", []))
++
++    for input_drv, spec in data.get("inputDrvs", {}).items():
++        wanted = spec.get("outputs", []) if isinstance(spec, dict) else list(spec)
++        input_outputs = derivation_show(input_drv).get("outputs", {})
++        for name in wanted:
++            path = input_outputs.get(name, {}).get("path")
++            if path:
++                paths.append(path)
++
++    return list(dict.fromkeys(paths))
++
++
++def stub_quote(binding: str) -> str:
++    return base64.b64encode(binding.encode("utf-8")).decode("ascii")
++
++
++def get_quote(binding: str) -> str:
++    if os.environ.get("ATTESTATION_STUB_MODE", "0") == "1":
++        return stub_quote(binding)
++    quote_tool = os.environ.get("ATTESTATION_QUOTE_TOOL", "")
++    if not quote_tool:
++        return stub_quote(binding)
++    return run([quote_tool, binding])
++
++
++def main(argv: list[str]) -> int:
++    if len(argv) < 2:
++        print(__doc__, file=sys.stderr)
++        return 2
++
++    store_dir = os.environ.get("ATTESTATION_STORE", "/var/lib/nix-attestations")
++    targets = argv[1:]
++
++    print(f"==> Collecting closure of {len(targets)} target(s)")
++    closure: list[str] = []
++    for target in targets:
++        closure.extend(run(["nix-store", "-q", "--requisites", target]).splitlines())
++    closure = list(dict.fromkeys(p for p in closure if p and not p.endswith(".drv")))
++    print(f"    {len(closure)} store paths")
++
++    # Group outputs by deriver: one certificate covers all outputs of a
++    # derivation, exactly as the post-build hook produces it.
++    by_deriver: dict[str, list[str]] = collections.defaultdict(list)
++    orphans: list[str] = []
++
++    for path in closure:
++        deriver = try_run(["nix-store", "-q", "--deriver", path])
++        if not deriver or deriver == "unknown-deriver" or not os.path.exists(deriver):
++            orphans.append(path)
++        else:
++            by_deriver[deriver].append(path)
++
++    print(f"==> {len(by_deriver)} derivations to certify, {len(orphans)} without a deriver")
++
++    written = 0
++    failed = 0
++    for drv_path, out_paths in sorted(by_deriver.items()):
++        try:
++            outputs_meta = derivation_show(drv_path).get("outputs", {})
++            name_by_path = {
++                meta.get("path"): name
++                for name, meta in outputs_meta.items()
++                if meta.get("path")
++            }
++
++            output_hashes = {
++                name_by_path.get(p, "out"): nar_hash_sri(p) for p in out_paths
++            }
++            input_hashes = sorted(nar_hash_sri(p) for p in direct_input_paths(drv_path))
++
++            binding = compute_binding(drv_path, input_hashes, output_hashes)
++            cert = make_certificate(
++                drv_path, input_hashes, output_hashes, get_quote(binding)
++            )
++
++            for out_hash in output_hashes.values():
++                write_certificate(cert, store_dir, out_hash)
++                written += 1
++        except Exception as exc:  # noqa: BLE001 - report and continue
++            failed += 1
++            print(f"    FAILED {drv_path}: {exc}", file=sys.stderr)
++
++    print("")
++    print("================ BACKFILL SUMMARY ================")
++    print(f"  Certificates written : {written}")
++    print(f"  Derivations failed   : {failed}")
++    print(f"  Store                : {store_dir}")
++    print("==================================================")
++
++    if orphans:
++        hashes = sorted(nar_hash_sri(p) for p in orphans)
++        print("")
++        print("Paths with no deriver cannot be certified. Add these to nix.conf:")
++        print("")
++        print("attestation-bootstrap-inputs = " + " ".join(hashes))
++        print("")
++        for path in sorted(orphans):
++            print(f"  # {path}")
++
++    return 1 if failed else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main(sys.argv))
+diff --git a/contrib/attestation/nix-attestation-verify b/contrib/attestation/nix-attestation-verify
+new file mode 100755
+index 0000000000000000000000000000000000000000..78c99dcda71e02aec10ceb9a5a57c557c77a07be
+--- /dev/null
++++ b/contrib/attestation/nix-attestation-verify
+@@ -0,0 +1,124 @@
++#!/usr/bin/env python3
++"""
++External attestation verifier for Nix require-attestation.
++
++Usage:
++  nix-attestation-verify <certificate.json>
++
++Exit 0 if valid, non-zero otherwise.
++
++Accepts binding record v1, or a CACTEE asset_certificate.json that embeds
++nix_binding. In stub/POC mode (ATTESTATION_STUB_MODE=1 or attestation.type
++poc-cactee/stub), quote cryptography is not required.
++"""
++
++from __future__ import annotations
++
++import base64
++import json
++import os
++import sys
++
++from binding import validate_certificate
++
++
++def unwrap(cert: dict) -> dict:
++    if cert.get("version") == 1 and "binding" in cert:
++        return cert
++    nested = (
++        cert.get("duet_service_result", {})
++        .get("service_result", {})
++        .get("nix_binding")
++    )
++    if isinstance(nested, dict):
++        return nested
++    raise ValueError(
++        "certificate is neither binding record v1 nor CACTEE with nix_binding"
++    )
++
++
++def output_hash_from_filename(basename: str, binding: dict) -> str:
++    stem = basename[:-5]
++    restored = stem.replace("_", "/")
++    values = list(binding.get("outputs", {}).values())
++    if restored in values:
++        return restored
++    if stem in values:
++        return stem
++    for v in values:
++        if isinstance(v, str) and v.replace("/", "_") == stem:
++            return v
++    if values:
++        return values[0]
++    raise ValueError("certificate has no outputs to verify against")
++
++
++def verify_quote(binding: dict) -> None:
++    att = binding.get("attestation", {})
++    kind = att.get("type")
++    if kind in ("poc-cactee", "stub"):
++        return
++    if os.environ.get("ATTESTATION_STUB_MODE", "0") == "1" and kind == "tdx":
++        quote_b64 = att.get("quote", "")
++        padded = quote_b64 + "=" * (-len(quote_b64) % 4)
++        try:
++            decoded = base64.b64decode(padded, validate=True).decode("utf-8")
++        except Exception:
++            decoded = ""
++        if decoded != binding["binding"]:
++            raise ValueError("stub quote does not match binding digest")
++        return
++    if kind != "tdx":
++        raise ValueError(f"unsupported attestation type: {kind}")
++
++    quote_b64 = att.get("quote", "")
++    if not quote_b64:
++        raise ValueError("empty quote")
++
++    verify_tool = os.environ.get("ATTESTATION_VERIFY_TOOL", "")
++    if not verify_tool:
++        raise ValueError(
++            "no ATTESTATION_VERIFY_TOOL set and ATTESTATION_STUB_MODE is not 1, "
++            "so the TDX quote cannot be verified; set ATTESTATION_VERIFY_TOOL, "
++            "or set ATTESTATION_STUB_MODE=1 for development"
++        )
++
++    import subprocess
++
++    result = subprocess.run(
++        [verify_tool, quote_b64, binding["binding"]],
++        capture_output=True,
++        text=True,
++    )
++    if result.returncode != 0:
++        raise ValueError(f"TDX quote verification failed: {result.stderr}")
++
++
++def main() -> int:
++    if len(sys.argv) != 2:
++        print(f"usage: {sys.argv[0]} <certificate.json>", file=sys.stderr)
++        return 2
++
++    cert_path = sys.argv[1]
++    with open(cert_path, encoding="utf-8") as f:
++        cert = json.load(f)
++
++    basename = os.path.basename(cert_path)
++    if not basename.endswith(".json"):
++        print("ERROR: certificate filename must end in .json", file=sys.stderr)
++        return 1
++
++    try:
++        binding = unwrap(cert)
++        expected_hash = output_hash_from_filename(basename, binding)
++        validate_certificate(binding, expected_hash)
++        verify_quote(binding)
++    except (ValueError, KeyError) as e:
++        print(f"ERROR: {e}", file=sys.stderr)
++        return 1
++
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/contrib/attestation/nix-certifier b/contrib/attestation/nix-certifier
+new file mode 100755
+index 0000000000000000000000000000000000000000..45900ba5ec69e11eb06c34238ab475ce0cc46530
+--- /dev/null
++++ b/contrib/attestation/nix-certifier
+@@ -0,0 +1,147 @@
++#!/usr/bin/env python3
++"""
++Post-build hook: create binding record v1 certificates for each output.
++
++Environment (set by Nix post-build-hook):
++  DRV_PATH   - derivation path
++  OUT_PATHS  - space-separated output store paths
++
++Configuration (environment):
++  ATTESTATION_STORE       - certificate directory (default: /var/lib/nix-attestations)
++  ATTESTATION_STUB_MODE   - if "1", use stub TDX quote (for dev without hardware)
++"""
++
++from __future__ import annotations
++
++import base64
++import json
++import os
++import subprocess
++import sys
++
++from binding import compute_binding, make_certificate, write_certificate
++
++
++def run(cmd: list[str]) -> str:
++    result = subprocess.run(cmd, check=True, capture_output=True, text=True)
++    return result.stdout.strip()
++
++
++def nar_hash_sri(store_path: str) -> str:
++    """Return NAR hash in SRI format for a store path."""
++    info = json.loads(run(["nix", "path-info", "--json", store_path]))[0]
++    return info["narHash"]
++
++
++def derivation_show(drv_path: str) -> dict:
++    """Return the parsed derivation JSON for one derivation path."""
++    raw = run([
++        "nix", "--extra-experimental-features", "nix-command",
++        "derivation", "show", drv_path,
++    ])
++    return json.loads(raw)[drv_path]
++
++
++def derivation_direct_input_paths(drv_path: str) -> list[str]:
++    """Return the direct input store paths of a derivation.
++
++    This must match what libstore iterates over in
++    verifyDirectInputAttestations, namely the derivation's own inputSrcs plus
++    the specific outputs it consumes from each input derivation. Taking every
++    output of each input derivation would add paths libstore never checks, and
++    the binding digest would then disagree.
++    """
++    data = derivation_show(drv_path)
++
++    paths: list[str] = list(data.get("inputSrcs", []))
++
++    for input_drv, spec in data.get("inputDrvs", {}).items():
++        wanted = spec.get("outputs", []) if isinstance(spec, dict) else list(spec)
++        input_outputs = derivation_show(input_drv).get("outputs", {})
++        for name in wanted:
++            path = input_outputs.get(name, {}).get("path")
++            if path:
++                paths.append(path)
++
++    # Deduplicate while keeping determinism; two output names can resolve to
++    # the same path, and libstore holds inputs in a set.
++    return list(dict.fromkeys(paths))
++
++
++def derivation_direct_inputs(drv_path: str) -> list[str]:
++    """Return sorted NAR hashes (SRI) of direct input store paths."""
++    paths = derivation_direct_input_paths(drv_path)
++    return sorted(nar_hash_sri(p) for p in paths if p)
++
++
++def output_path_to_name(drv_path: str, out_paths: list[str]) -> dict[str, str]:
++    """Map each built output store path to its derivation output name."""
++    raw = run(["nix-store", "-q", "--outputs", drv_path])
++    name_by_path: dict[str, str] = {}
++    for line in raw.splitlines():
++        parts = line.split(maxsplit=1)
++        if len(parts) == 2:
++            name_by_path[parts[1]] = parts[0]
++    return {out_path: name_by_path.get(out_path, "out") for out_path in out_paths}
++
++
++def stub_quote(binding: str) -> str:
++    """Dev stub: base64-encoded binding digest stands in for a TDX quote."""
++    return base64.b64encode(binding.encode("utf-8")).decode("ascii")
++
++
++def get_tdx_quote(binding: str) -> str:
++    """Obtain TDX quote with binding in report_data, or stub in dev mode."""
++    if os.environ.get("ATTESTATION_STUB_MODE", "0") == "1":
++        return stub_quote(binding)
++
++    quote_tool = os.environ.get("ATTESTATION_QUOTE_TOOL", "")
++    if not quote_tool:
++        print(
++            "WARNING: ATTESTATION_STUB_MODE not set and ATTESTATION_QUOTE_TOOL empty; "
++            "using stub quote",
++            file=sys.stderr,
++        )
++        return stub_quote(binding)
++
++    result = subprocess.run(
++        [quote_tool, binding],
++        check=True,
++        capture_output=True,
++        text=True,
++    )
++    return result.stdout.strip()
++
++
++def main() -> int:
++    drv_path = os.environ.get("DRV_PATH", "")
++    out_paths = os.environ.get("OUT_PATHS", "").split()
++    store_dir = os.environ.get("ATTESTATION_STORE", "/var/lib/nix-attestations")
++
++    if not drv_path or not out_paths:
++        print("ERROR: DRV_PATH and OUT_PATHS must be set", file=sys.stderr)
++        return 1
++
++    input_hashes = derivation_direct_inputs(drv_path)
++    output_hashes: dict[str, str] = {}
++
++    for out_path, name in output_path_to_name(drv_path, out_paths).items():
++        output_hashes[name] = nar_hash_sri(out_path)
++
++    binding = compute_binding(drv_path, input_hashes, output_hashes)
++    quote = get_tdx_quote(binding)
++    cert = make_certificate(drv_path, input_hashes, output_hashes, quote)
++
++    written = []
++    for out_hash in output_hashes.values():
++        path = write_certificate(cert, store_dir, out_hash)
++        written.append(path)
++
++    print(f"attestation: wrote {len(written)} certificate(s) to {store_dir}")
++    for p in written:
++        print(f"  {p}")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/contrib/attestation/package-builder/.gitignore b/contrib/attestation/package-builder/.gitignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..4c8cf24db970ed24e7e463d1912dc9ed2c15e18a
+--- /dev/null
++++ b/contrib/attestation/package-builder/.gitignore
+@@ -0,0 +1,9 @@
++cache.secret
++cache.sk
++cache.pub
++*.pem
++certs/*.key
++build-logs/
++
++vendor/jo-src/README
++
+diff --git a/contrib/attestation/package-builder/Dockerfile b/contrib/attestation/package-builder/Dockerfile
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad56a8398ee7e6d31b021eaab73aa59e92dbbb38
+--- /dev/null
++++ b/contrib/attestation/package-builder/Dockerfile
+@@ -0,0 +1,102 @@
++# syntax=docker/dockerfile:1.4
++# Stage 1: compile Nix fork (substitute=false). Stage 2: build jo + export NARs.
++#
++#   DOCKER_BUILDKIT=1 ./build.sh
++#
++# Evaluator must be new enough for nixpkgs 26.05 (env vs derivation attrs).
++FROM nixos/nix:2.31.2 AS nix-tee-prep
++
++ARG CORPORATE_CA_B64=
++ARG NIXPKGS_TARBALL=https://github.com/NixOS/nixpkgs/archive/nixos-26.05.tar.gz
++
++COPY setup-ca-bundle.sh /build/setup-ca-bundle.sh
++COPY certs/ /build/certs/
++RUN set -eux; \
++    tr -d '\r' < /build/setup-ca-bundle.sh > /build/setup-ca-bundle.sh.lf; \
++    mv /build/setup-ca-bundle.sh.lf /build/setup-ca-bundle.sh; \
++    chmod +x /build/setup-ca-bundle.sh; \
++    CORPORATE_CA_B64="${CORPORATE_CA_B64}" bash /build/setup-ca-bundle.sh
++
++ENV SSL_CERT_FILE=/etc/nix/ca-bundle.crt \
++    NIX_SSL_CERT_FILE=/etc/nix/ca-bundle.crt \
++    GIT_SSL_CAINFO=/etc/nix/ca-bundle.crt \
++    NIX_GIT_SSL_CAINFO=/etc/nix/ca-bundle.crt
++
++RUN mkdir -p /etc/nix && printf '%s\n' \
++    '--http1.1' '--retry 8' '--retry-all-errors' '--connect-timeout 60' \
++    > /etc/nix/.curlrc
++ENV CURL_HOME=/etc/nix
++
++WORKDIR /build
++COPY fork-nixpkgs/default.nix /build/fork-nixpkgs/default.nix
++COPY nix-docker.conf prefetch.sh compile-nix-fork.sh sync-nix-cache.sh restore-symlinks.sh nix-fork-classic.nix \
++     fork-build-overlay.nix gnu-mirror-overlay.nix export-closure.sh /build/
++COPY vendor/ /build/vendor/
++RUN set -eux; \
++    for f in /build/nix-docker.conf /build/prefetch.sh /build/compile-nix-fork.sh \
++             /build/sync-nix-cache.sh /build/restore-symlinks.sh /build/nix-fork-classic.nix \
++             /build/fork-build-overlay.nix \
++             /build/fork-nixpkgs/default.nix /build/gnu-mirror-overlay.nix \
++             /build/export-closure.sh \
++             /build/vendor/gnu-config/config.guess /build/vendor/gnu-config/config.sub; do \
++      [ -f "$f" ] || continue; \
++      tr -d '\r' < "$f" > "$f.lf"; mv "$f.lf" "$f"; \
++    done; \
++    for f in /build/vendor/busybox-patches/*.patch /build/vendor/busybox-patches/*.sh \
++             /build/vendor/unzip-patches/*.patch; do \
++      [ -f "$f" ] || continue; \
++      tr -d '\r' < "$f" > "$f.lf"; mv "$f.lf" "$f"; \
++    done; \
++    chmod +x /build/vendor/busybox-patches/apply-cve-2026.sh; \
++    chmod +x /build/export-closure.sh /build/prefetch.sh /build/compile-nix-fork.sh \
++             /build/sync-nix-cache.sh /build/restore-symlinks.sh /build/setup-ca-bundle.sh; \
++    cp /build/nix-docker.conf /etc/nix/nix.conf
++
++RUN --mount=type=cache,target=/var/cache/nixpkgs-dl \
++    set -eux; \
++    key="$(printf '%s' "${NIXPKGS_TARBALL}" | sha256sum | cut -c1-32)"; \
++    tarball="/var/cache/nixpkgs-dl/nixpkgs-${key}.tar.gz"; \
++    if [ ! -f "${tarball}" ]; then \
++      curl -fsSL --cacert /etc/nix/ca-bundle.crt -o "${tarball}" "${NIXPKGS_TARBALL}"; \
++    fi; \
++    mkdir -p /nixpkgs; \
++    tar -xzf "${tarball}" -C /nixpkgs --strip-components=1; \
++    echo "nixpkgs $(cat /nixpkgs/.version) from ${NIXPKGS_TARBALL}"
++
++ENV NIX_PATH=nixpkgs=/nixpkgs
++
++COPY --from=nixsrc . /nix-src/
++WORKDIR /nix-src
++RUN bash /build/restore-symlinks.sh /nix-src
++
++FROM nix-tee-prep AS nix-tee-base
++
++# Cache mounts survive a failed RUN; the image layer does not. Do not mount over
++# /nix — the store must be copied into this layer on success so nokia-runner
++# (test_docker.py, classic builder, FROM nix-tee-base) still has a real store.
++RUN --mount=type=cache,id=nix-tee-store,sharing=locked,target=/mnt/nix-tee-cache/store \
++    --mount=type=cache,id=nix-tee-var,sharing=locked,target=/mnt/nix-tee-cache/var \
++    bash -euxo pipefail -c '\
++    bash /build/sync-nix-cache.sh restore; \
++    trap "bash /build/sync-nix-cache.sh save" EXIT; \
++    bash /build/compile-nix-fork.sh \
++      2>&1 | tee /build/logs/06-nix-fork-compile.log'
++
++FROM nix-tee-base AS package-builder
++
++# jo.nix uses ./vendor/jo-src (already COPY'd in nix-tee-prep). Do not
++# re-fetch from GitHub: archive tarball hashes drift and fail prefetch.
++COPY jo.nix nixpkgs-with-overlay.nix /build/
++RUN set -eux; \
++    for f in /build/jo.nix /build/nixpkgs-with-overlay.nix; do \
++      tr -d '\r' < "$f" > "$f.lf"; mv "$f.lf" "$f"; \
++    done; \
++    test -f /build/vendor/jo-src/jo.c
++
++RUN bash -euxo pipefail -c '\
++    nix-build /build/jo.nix -o /result \
++      --option substitute false \
++      --option ssl-cert-file /etc/nix/ca-bundle.crt \
++      2>&1 | tee /build/logs/10-jo-build.log'
++
++CMD ["/build/export-closure.sh", "/tmp/outputs", "/result"]
+diff --git a/contrib/attestation/package-builder/README.md b/contrib/attestation/package-builder/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..b39465cc41f65f1557587ba6d2978d2356d2b53b
+--- /dev/null
++++ b/contrib/attestation/package-builder/README.md
+@@ -0,0 +1,62 @@
++# Package builder
++
++Same tree as `~/dev_test_docker/certconf/nix-package-builder` on Ubuntu-24.04. Do not put `cache.secret` here.
++
++## Commands we used (from `~/.bash_history` + `build-logs/`)
++
++Working directory: `~/dev_test_docker/certconf/nix-package-builder`
++
++### 1. Base image (`nix-tee-base`) — succeeded
++
++Log: `build-logs/nix-tee-base-20260910-160117.log` → `nix-tee-base:latest`
++
++```bash
++cd ~/dev_test_docker/certconf/nix-package-builder
++NIX_SRC=/mnt/c/nixDocs/freshNix/nix ./build.sh nix-tee-base nix-tee-base
++docker run --rm --entrypoint nix nix-tee-base --version
++```
++
++`build.sh` runs BuildKit `docker build --target nix-tee-base -t nix-tee-base .` with `--build-context nixsrc=${NIX_SRC}`.
++
++### 2. Package image with overlays (`nokia-runner`) — this is the one that exported `jo`
++
++`cert_config.json` has `"code_folder": "nokia-runner/"`. Image tag from `test_docker.py`: `test-nix-jo-build`.
++
++```bash
++cd ~/dev_test_docker/certconf/nix-package-builder
++./stage-nokia-runner.sh
++cd ~/dev_test_docker
++source .venv/bin/activate
++python3 test_docker.py certconf/nix-package-builder/cert_config.json
++```
++
++Export NARs (after the Nokia build):
++
++```bash
++mkdir -p ~/dev_test_docker/test_temp/tmp/outputs
++docker rm -f test-nix-jo-build 2>/dev/null || true
++docker run --rm --network none \
++  -v "$HOME/dev_test_docker/test_temp/tmp/outputs:/tmp/outputs" \
++  -v "$HOME/dev_test_docker/certconf/nix-package-builder/export-closure.sh:/build/export-closure.sh:ro" \
++  --entrypoint bash test-nix-jo-build \
++  /build/export-closure.sh /tmp/outputs /build/results
++```
++
++Sign sidecars (keys generated in the base image; do not commit `cache.secret`):
++
++```bash
++cd ~/dev_test_docker/certconf/nix-package-builder
++docker run --rm -v "$PWD:/keys" --entrypoint nix-store nix-tee-base \
++  --generate-binary-cache-key harmonia-1 /keys/cache.secret /keys/cache.pub
++python3 sign-attestation-certs.py --secret-key ./cache.secret \
++  ~/dev_test_docker/test_temp/tmp/outputs
++```
++
++### Not used for the attested `jo` closure
++
++```bash
++# Typed once; build-logs/nix-jo-builder-20260910-101007.log FAILED (jo hash mismatch)
++NIX_SRC=/mnt/c/nixDocs/freshNix/nix ./build.sh package-builder nix-jo-builder
++```
++
++No history of `-f Dockerfile.nix-tee-base` or `-f Dockerfile.package`.
+diff --git a/contrib/attestation/package-builder/build.sh b/contrib/attestation/package-builder/build.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..879bd97afa08925e5ab199e9d0206062615b25ae
+--- /dev/null
++++ b/contrib/attestation/package-builder/build.sh
+@@ -0,0 +1,57 @@
++#!/usr/bin/env bash
++# Build helper — BuildKit, corporate CA, Nix fork path, log saving.
++set -euo pipefail
++
++cd "$(dirname "$0")"
++
++export DOCKER_BUILDKIT=1
++
++NIX_SRC="${NIX_SRC:-/mnt/c/nixDocs/freshNix/nix}"
++TARGET="${1:-nix-tee-base}"
++IMAGE="${2:-nix-tee-base}"
++
++mkdir -p build-logs
++LOGFILE="build-logs/${IMAGE}-$(date +%Y%m%d-%H%M%S).log"
++
++# Windows editors reintroduce CRLF constantly; a stray \r in a patch or script
++# only surfaces an hour into the build. Normalize up front.
++if command -v python3 >/dev/null 2>&1; then
++  python3 ./fix-eol.py
++fi
++
++CA_ARGS=()
++if [ -f certs/zscaler-root-ca.crt ]; then
++  CA_ARGS=(--build-arg "CORPORATE_CA_B64=$(base64 -w0 certs/zscaler-root-ca.crt)")
++fi
++
++if [ ! -f "${NIX_SRC}/flake.nix" ]; then
++  echo "ERROR: Nix fork not found at ${NIX_SRC}/flake.nix" >&2
++  echo "Set NIX_SRC to your fork path, e.g.:" >&2
++  echo "  NIX_SRC=/mnt/c/nixDocs/freshNix/nix ./build.sh" >&2
++  exit 1
++fi
++
++echo "==> Building target=${TARGET} image=${IMAGE} nixsrc=${NIX_SRC}"
++echo "==> Log file: ${LOGFILE}"
++
++# --progress=plain: full Nix output (no fancy UI that hides retries/504)
++docker build \
++  --progress=plain \
++  --build-context "nixsrc=${NIX_SRC}" \
++  "${CA_ARGS[@]}" \
++  --target "${TARGET}" \
++  -t "${IMAGE}" \
++  . 2>&1 | tee "${LOGFILE}"
++
++echo "==> Done. Log saved: ${LOGFILE}"
++
++# Extract in-image step logs if image exists
++if docker image inspect "${IMAGE}" >/dev/null 2>&1; then
++  STEP_LOG_DIR="build-logs/${IMAGE}-steps-$(date +%Y%m%d-%H%M%S)"
++  mkdir -p "${STEP_LOG_DIR}"
++  docker run --rm --entrypoint sh "${IMAGE}" -c \
++    'if [ -d /build/logs ]; then tar -c -C /build logs; fi' 2>/dev/null \
++    | tar -x -C "${STEP_LOG_DIR}" 2>/dev/null \
++    && echo "==> Step logs extracted: ${STEP_LOG_DIR}/logs/" \
++    || true
++fi
+diff --git a/contrib/attestation/package-builder/certs/.gitkeep b/contrib/attestation/package-builder/certs/.gitkeep
+new file mode 100644
+index 0000000000000000000000000000000000000000..8b137891791fe96927ad78e64b0aad7bded08bdc
+--- /dev/null
++++ b/contrib/attestation/package-builder/certs/.gitkeep
+@@ -0,0 +1 @@
++
+diff --git a/contrib/attestation/package-builder/compile-nix-fork.sh b/contrib/attestation/package-builder/compile-nix-fork.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..b438e69bf182efe61cad6acd57b9a22b7e009478
+--- /dev/null
++++ b/contrib/attestation/package-builder/compile-nix-fork.sh
+@@ -0,0 +1,30 @@
++#!/usr/bin/env bash
++# Build Nix fork via classic nix-build (substitute=false).
++set -euo pipefail
++
++cd /nix-src
++bash /build/restore-symlinks.sh /nix-src
++
++export NIX_GIT_SSL_CAINFO=/etc/nix/ca-bundle.crt
++
++test -d /nixpkgs || {
++  echo "ERROR: /nixpkgs missing" >&2
++  exit 1
++}
++
++bash /build/prefetch.sh fork
++
++echo "==> Building nix-cli (substitute=false, nixpkgs $(cat /nixpkgs/.version))"
++nix-build /build/nix-fork-classic.nix -A nix-cli \
++  --option substitute false \
++  --option ssl-cert-file /etc/nix/ca-bundle.crt \
++  --option max-jobs 4 \
++  -o /nix-src/nix-cli-result
++
++for bin in nix nix-store nix-build nix-instantiate; do
++  if [ -x "/nix-src/nix-cli-result/bin/${bin}" ]; then
++    cp "/nix-src/nix-cli-result/bin/${bin}" /nix/var/nix/profiles/default/bin/
++  fi
++done
++
++nix --version
+diff --git a/contrib/attestation/package-builder/export-closure.sh b/contrib/attestation/package-builder/export-closure.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..ffd11038722c6c6b792fb9912810a6b7e9d06918
+--- /dev/null
++++ b/contrib/attestation/package-builder/export-closure.sh
+@@ -0,0 +1,412 @@
++#!/usr/bin/env bash
++# Export the jo derivation graph leaves-first (certificate order).
++# Example: bootstrap/FOD sources -> glibc -> gcc -> … -> jo.
++# Each node is its own NAR when possible; otherwise the raw file/dir is copied.
++set -euo pipefail
++
++OUT="${1:-/tmp/outputs}"
++RESULTS="${2:-/build/results}"
++
++mkdir -p "${OUT}/nars" "${OUT}/packages"
++# Drop leftover runtime-only exports from earlier runs.
++rm -rf "${OUT}/packages" "${OUT}/nars" "${OUT}/files"
++mkdir -p "${OUT}/nars" "${OUT}/packages" "${OUT}/files"
++
++if [ ! -d "${RESULTS}" ]; then
++  echo "ERROR: ${RESULTS} not found — Dockerfile must nix-build -o /build/results/<name>" >&2
++  exit 1
++fi
++
++ROOT_LINK="${RESULTS}/jo"
++if [ ! -e "${ROOT_LINK}" ]; then
++  ROOT_LINK="/result"
++fi
++if [ ! -e "${ROOT_LINK}" ]; then
++  echo "ERROR: root package jo not found under ${RESULTS}/jo or /result" >&2
++  exit 1
++fi
++ROOT=$(readlink -f "${ROOT_LINK}")
++ROOT_DRV=$(nix-store -q --deriver "${ROOT}" 2>/dev/null || true)
++if [ -z "${ROOT_DRV}" ] || [ "${ROOT_DRV}" = "unknown" ]; then
++  echo "ERROR: no deriver for root ${ROOT}" >&2
++  exit 1
++fi
++
++echo "==> root ${ROOT}"
++echo "==> drv  ${ROOT_DRV}"
++echo "==> walking full derivation graph (build-time + runtime inputs)"
++
++find_python3() {
++  if command -v python3 >/dev/null 2>&1; then
++    command -v python3
++    return 0
++  fi
++  local p
++  for p in /nix/store/*-python3-*/bin/python3; do
++    [ -x "$p" ] || continue
++    case "$p" in
++      *-debug*) continue ;;
++    esac
++    printf '%s\n' "$p"
++    return 0
++  done
++  return 1
++}
++
++PYTHON=$(find_python3) || {
++  echo "ERROR: python3 not on PATH and no /nix/store/*-python3-*/bin/python3" >&2
++  exit 1
++}
++
++GRAPH=$(mktemp)
++"${PYTHON}" - "${ROOT_DRV}" <<'PY' > "${GRAPH}"
++import json, os, subprocess, sys
++
++root_drv = sys.argv[1]
++flags = ["--extra-experimental-features", "nix-command"]
++store = root_drv.rsplit("/", 1)[0] if root_drv.startswith("/") else "/nix/store"
++
++
++def abs_store(path):
++    if not path:
++        return path
++    if str(path).startswith("/"):
++        return path
++    return f"{store}/{path}"
++
++
++def load_drvs(raw):
++    parsed = json.loads(raw)
++    if isinstance(parsed, dict) and "derivations" in parsed:
++        return parsed["derivations"]
++    return parsed
++
++
++def lookup(drvs, path):
++    base = path.rsplit("/", 1)[-1]
++    for key in (path, base, abs_store(path)):
++        if key in drvs:
++            return drvs[key]
++    for k, v in drvs.items():
++        if k.endswith(base):
++            return v
++    raise KeyError(path, list(drvs)[:8])
++
++
++def input_srcs(data):
++    if "inputSrcs" in data:
++        return list(data.get("inputSrcs") or [])
++    inputs = data.get("inputs") or {}
++    return list(inputs.get("srcs") or [])
++
++
++def input_drvs(data):
++    if "inputDrvs" in data:
++        return data.get("inputDrvs") or {}
++    inputs = data.get("inputs") or {}
++    return inputs.get("drvs") or {}
++
++
++def output_path(out):
++    if not isinstance(out, dict):
++        return None
++    p = out.get("path")
++    return abs_store(p) if p else None
++
++
++def output_paths(data):
++    outs = data.get("outputs") or {}
++    found = []
++    for _name, out in outs.items():
++        p = output_path(out)
++        if p:
++            found.append(p)
++    return found
++
++
++proc = subprocess.run(
++    ["nix", *flags, "derivation", "show", "-r", root_drv],
++    capture_output=True, text=True,
++)
++if proc.returncode != 0:
++    sys.stderr.write(proc.stderr or "")
++    proc.check_returncode()
++
++drvs = load_drvs(proc.stdout)
++sys.stderr.write(f"==> graph derivations: {len(drvs)}\n")
++
++# path -> (drv_abs or empty, list of direct input paths)
++rows = {}
++
++for drv_key, data in drvs.items():
++    drv_abs = abs_store(drv_key)
++    ins = []
++    for src in input_srcs(data):
++        ins.append(abs_store(src))
++    for idrv, spec in input_drvs(data).items():
++        names = spec.get("outputs", []) if isinstance(spec, dict) else list(spec)
++        try:
++            child = lookup(drvs, idrv)
++        except KeyError:
++            child = None
++        if child is None:
++            continue
++        child_outs = child.get("outputs") or {}
++        for name in names:
++            p = output_path(child_outs.get(name, {}))
++            if p:
++                ins.append(p)
++    seen = set()
++    ins_u = []
++    for p in ins:
++        if p and p not in seen:
++            seen.add(p)
++            ins_u.append(p)
++    for p in output_paths(data):
++        rows[p] = (drv_abs, ins_u)
++
++for drv_key, data in drvs.items():
++    for src in input_srcs(data):
++        s = abs_store(src)
++        if s.endswith(".drv"):
++            continue
++        if s not in rows:
++            rows[s] = ("", [])
++
++nodes = [p for p in rows if not p.endswith(".drv")]
++preds = {}
++for p in nodes:
++    preds[p] = [i for i in rows[p][1] if i in rows and i != p and not i.endswith(".drv")]
++
++import heapq
++indeg = {p: 0 for p in nodes}
++adj = {p: [] for p in nodes}
++for p in nodes:
++    for i in preds[p]:
++        adj[i].append(p)
++        indeg[p] += 1
++
++heap = [p for p in nodes if indeg[p] == 0]
++heapq.heapify(heap)
++order = []
++depth = {p: 0 for p in nodes}
++while heap:
++    n = heapq.heappop(heap)
++    order.append(n)
++    for d in adj[n]:
++        depth[d] = max(depth[d], depth[n] + 1)
++        indeg[d] -= 1
++        if indeg[d] == 0:
++            heapq.heappush(heap, d)
++seen_order = set(order)
++for p in sorted(nodes):
++    if p not in seen_order:
++        order.append(p)
++
++dmax = max(depth.values(), default=0)
++sys.stderr.write(
++    f"==> cert order: {len(order)} units, leaves first, max depth {dmax}\n"
++)
++
++for path in order:
++    drv, ins = rows[path]
++    print(f"{path}\t{drv}\t{','.join(ins)}\t{depth.get(path, 0)}")
++PY
++
++json_escape() {
++  local s=$1
++  s=${s//\\/\\\\}
++  s=${s//\"/\\\"}
++  printf '%s' "$s"
++}
++
++declare -A NAR_HASH
++
++nar_hash_sri() {
++  local p=$1
++  if [ -n "${NAR_HASH[$p]:-}" ]; then
++    printf '%s' "${NAR_HASH[$p]}"
++    return
++  fi
++  local h
++  if h=$(nix --extra-experimental-features nix-command hash path --sri "$p" 2>/dev/null); then
++    :
++  elif [ -f "$p" ]; then
++    h=$(nix --extra-experimental-features nix-command hash file --sri "$p")
++  else
++    h="unknown"
++  fi
++  NAR_HASH[$p]=$h
++  printf '%s' "$h"
++}
++
++pkg_name_from_path() {
++  local base
++  base=$(basename "$1")
++  printf '%s' "${base}"
++}
++
++export_one() {
++  local name=$1
++  local root=$2
++  local drv=$3
++  local ins_csv=$4
++  local depth=$5
++  local pkg="${OUT}/packages/${name}"
++  mkdir -p "${pkg}"
++
++  echo "${root}" > "${pkg}/store-path.txt"
++
++  local nar_hash nar_file nar_path nar_stem drv_json inputs_json kind
++  kind="nar"
++  nar_hash=$(nar_hash_sri "${root}")
++  nar_stem=$(printf '%s' "${nar_hash}" | tr '/' '_')
++  if [ "${nar_stem}" = "unknown" ]; then
++    nar_stem="${name}"
++  fi
++  nar_file="nars/${nar_stem}.nar"
++  nar_path="${OUT}/${nar_file}"
++
++  if [ ! -f "${nar_path}" ]; then
++    if nix-store --dump "${root}" > "${nar_path}" 2>/dev/null && [ -s "${nar_path}" ]; then
++      kind="nar"
++    else
++      rm -f "${nar_path}"
++      if [ -f "${root}" ]; then
++        kind="file"
++        nar_file="files/${name}"
++        cp -a "${root}" "${OUT}/${nar_file}"
++        nar_hash=$(nix --extra-experimental-features nix-command hash file --sri "${OUT}/${nar_file}")
++        NAR_HASH[$root]=$nar_hash
++      elif [ -e "${root}" ]; then
++        kind="tar"
++        nar_file="files/${name}.tar"
++        tar -C "$(dirname "${root}")" -cf "${OUT}/${nar_file}" "$(basename "${root}")"
++        nar_hash=$(nix --extra-experimental-features nix-command hash file --sri "${OUT}/${nar_file}")
++        NAR_HASH[$root]=$nar_hash
++      else
++        echo "    SKIP missing ${root}" >&2
++        rm -rf "${pkg}"
++        return 1
++      fi
++    fi
++  fi
++  if [ "${kind}" = "nar" ]; then
++    ln -sfn "../../${nar_file}" "${pkg}/output.nar"
++  else
++    ln -sfn "../../${nar_file}" "${pkg}/output.bin"
++  fi
++
++  if [ -z "${drv}" ]; then
++    drv_json="null"
++  else
++    drv_json="\"$(json_escape "${drv}")\""
++  fi
++
++  if [ -z "${ins_csv}" ]; then
++    inputs_json="[]"
++    hashes_json="[]"
++  else
++    local inp h
++    local -a inps=()
++    IFS=',' read -r -a inps <<< "${ins_csv}"
++    local -a lines=()
++    for inp in "${inps[@]}"; do
++      [ -n "${inp}" ] || continue
++      [ -e "${inp}" ] || continue
++      h=$(nar_hash_sri "${inp}")
++      lines+=("${inp}"$'\t'"${h}")
++    done
++    if [ "${#lines[@]}" -eq 0 ]; then
++      inputs_json="[]"
++      hashes_json="[]"
++    else
++      local sorted first=1
++      sorted=$(printf '%s\n' "${lines[@]}" | sort)
++      inputs_json="["
++      hashes_json="["
++      local sp
++      while IFS=$'\t' read -r sp h; do
++        [ -n "${sp}" ] || continue
++        [ "${first}" -eq 1 ] || { inputs_json+=","; hashes_json+=","; }
++        first=0
++        inputs_json+="{\"storePath\":\"$(json_escape "${sp}")\",\"narHash\":\"$(json_escape "${h}")\"}"
++        hashes_json+="\"$(json_escape "${h}")\""
++      done <<< "${sorted}"
++      inputs_json+="]"
++      hashes_json+="]"
++    fi
++  fi
++
++  {
++    echo '{'
++    echo '  "version": 1,'
++    printf '  "package": "%s",\n' "$(json_escape "${name}")"
++    printf '  "storePath": "%s",\n' "$(json_escape "${root}")"
++    printf '  "kind": "%s",\n' "$(json_escape "${kind}")"
++    printf '  "certDepth": %s,\n' "${depth:-0}"
++    printf '  "narHash": "%s",\n' "$(json_escape "${nar_hash}")"
++    printf '  "narFile": "%s",\n' "$(json_escape "${nar_file}")"
++    printf '  "drvPath": %s,\n' "${drv_json}"
++    printf '  "directInputs": %s,\n' "${inputs_json}"
++    printf '  "directInputNarHashes": %s\n' "${hashes_json}"
++    echo '}'
++  } > "${pkg}/manifest.json"
++
++  echo "    ${name} depth=${depth:-0} ${kind} -> ${nar_hash}"
++}
++
++INDEX=$(mktemp)
++count=0
++skip=0
++while IFS=$'\t' read -r path drv ins_csv depth; do
++  [ -n "${path}" ] || continue
++  name=$(pkg_name_from_path "${path}")
++  echo "==> package ${name}"
++  if export_one "${name}" "${path}" "${drv}" "${ins_csv}" "${depth:-0}"; then
++    printf '%s\n' "${name}" >> "${INDEX}"
++    count=$((count + 1))
++  else
++    skip=$((skip + 1))
++  fi
++done < "${GRAPH}"
++rm -f "${GRAPH}"
++
++if [ ! -s "${INDEX}" ]; then
++  echo "ERROR: no paths exported from ${ROOT_DRV}" >&2
++  exit 1
++fi
++
++echo "==> exported ${count} paths (${skip} missing on disk)"
++
++{
++  echo '{'
++  echo '  "version": 1,'
++  printf '  "root": "%s",\n' "$(json_escape "${ROOT}")"
++  printf '  "rootDrv": "%s",\n' "$(json_escape "${ROOT_DRV}")"
++  printf '  "certOrder": "leaves-first (bootstrap/FODs, then glibc, gcc, jo)",\n'
++  echo '  "packages": ['
++  first=1
++  while read -r name; do
++    [ "${first}" -eq 1 ] || echo ','
++    first=0
++    printf '    "%s"' "$(json_escape "${name}")"
++  done < "${INDEX}"
++  echo ''
++  echo '  ]'
++  echo '}'
++} > "${OUT}/index.json"
++
++rm -f "${INDEX}"
++
++if [ -x "${RESULTS}/jo/bin/jo" ]; then
++  "${RESULTS}/jo/bin/jo" -p name=jo version=1.7 > "${OUT}/demo.json"
++elif [ -x /result/bin/jo ]; then
++  /result/bin/jo -p name=jo version=1.7 > "${OUT}/demo.json"
++fi
++
++cp -r /build/logs "${OUT}/build-logs" 2>/dev/null || true
++
++echo "packages: $(ls -1 "${OUT}/packages" | wc -l)"
++echo "NAR files: $(ls -1 "${OUT}/nars"/*.nar 2>/dev/null | wc -l)"
++echo "index: ${OUT}/index.json"
+diff --git a/contrib/attestation/package-builder/fix-eol.py b/contrib/attestation/package-builder/fix-eol.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..2d13a23e031ceeb3257fce02bbc546576e504fb5
+--- /dev/null
++++ b/contrib/attestation/package-builder/fix-eol.py
+@@ -0,0 +1,37 @@
++#!/usr/bin/env python3
++"""Force LF line endings on every file the Linux build touches.
++
++The project is edited from Windows, so shell scripts, Nix expressions and
++patches routinely pick up CRLF. Inside the container that shows up as
++"/usr/bin/env: 'bash\\r': No such file or directory" or as patches that refuse
++to apply, which is a slow and confusing way to discover a line-ending problem.
++Run this after editing on Windows.
++"""
++import pathlib
++import sys
++
++ROOT = pathlib.Path(__file__).resolve().parent
++
++PATTERNS = ["*.sh", "*.nix", "*.conf", "Dockerfile", "vendor/**/*.patch",
++            "vendor/**/config.guess", "vendor/**/config.sub",
++            "fork-nixpkgs/*.nix"]
++
++changed = []
++for pattern in PATTERNS:
++    for path in sorted(ROOT.glob(pattern)):
++        if not path.is_file():
++            continue
++        raw = path.read_bytes()
++        fixed = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
++        if fixed != raw:
++            path.write_bytes(fixed)
++            changed.append(path.relative_to(ROOT).as_posix())
++
++if changed:
++    print("Normalized to LF:")
++    for name in changed:
++        print("  " + name)
++else:
++    print("All files already LF.")
++
++sys.exit(0)
+diff --git a/contrib/attestation/package-builder/fork-build-overlay.nix b/contrib/attestation/package-builder/fork-build-overlay.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..d221100372f5bd459dfc3f22a3d321f9d540b413
+--- /dev/null
++++ b/contrib/attestation/package-builder/fork-build-overlay.nix
+@@ -0,0 +1,57 @@
++# Proxy-only overlays. Package versions come from nixpkgs 26.05 (fork flake pin).
++final: prev:
++let
++  inherit (final) lib;
++in
++{
++  # Dead or proxy-blocked patch URLs (launchpad, busybox bug tracker).
++  busybox = prev.busybox.overrideAttrs (old: {
++    patches = lib.filter (
++      patch:
++      !(lib.isAttrs patch && patch ? name && lib.hasPrefix "CVE-2026-26157" patch.name)
++    ) (
++      lib.map (
++        patch:
++        if lib.isAttrs patch && patch ? name && patch.name == "CVE-2022-48174.patch" then
++          /build/vendor/busybox-patches/CVE-2022-48174.patch
++        else if lib.isAttrs patch && patch ? name && patch.name == "CVE-2023-42366.patch" then
++          /build/vendor/busybox-patches/CVE-2023-42366.patch
++        else if lib.isAttrs patch && patch ? name && patch.name == "CVE-2023-42363.patch" then
++          /build/vendor/busybox-patches/CVE-2023-42363.patch
++        else if lib.isAttrs patch && patch ? name && patch.name == "CVE-2023-42364_CVE-2023-42365.patch" then
++          /build/vendor/busybox-patches/CVE-2023-42364_CVE-2023-42365.patch
++        else if lib.isAttrs patch && patch ? name && patch.name == "CVE-2023-39810.patch" then
++          /build/vendor/busybox-patches/CVE-2023-39810.patch
++        else
++          patch
++      ) old.patches
++    );
++    postPatch = ''
++      bash /build/vendor/busybox-patches/apply-cve-2026.sh
++    '' + (old.postPatch or "");
++  });
++
++  unzip = prev.unzip.overrideAttrs (old: {
++    patches = lib.map (patch:
++      if lib.isAttrs patch && patch ? name && patch.name == "CVE-2021-4217.patch" then
++        /build/vendor/unzip-patches/CVE-2021-4217.patch
++      else
++        patch
++    ) old.patches;
++  });
++
++  # Keep 26.05's curl version (meets libstore >= 8.17). Only force HTTP/3 off:
++  # the fork's dependencies.nix sets http3Support, and ngtcp2 git clones fail
++  # through the corporate proxy. HTTP/3 is off by default in Nix anyway.
++  curl =
++    let
++      mk =
++        args:
++        (prev.curl.override (args // { http3Support = false; }))
++        // {
++          override = mkFrom args;
++        };
++      mkFrom = base: args: mk (base // args);
++    in
++    mk { };
++}
+diff --git a/contrib/attestation/package-builder/fork-nixpkgs/default.nix b/contrib/attestation/package-builder/fork-nixpkgs/default.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..e376c76d267a46aa67351186779b8c331104f22b
+--- /dev/null
++++ b/contrib/attestation/package-builder/fork-nixpkgs/default.nix
+@@ -0,0 +1,11 @@
++# Nixpkgs wrapper for fork compile: pinned /nixpkgs + overlays (gnu mirror, missing deps).
++args @ { overlays ? [], ... }:
++import /nixpkgs (
++  args
++  // {
++    overlays = overlays ++ [
++      (import /build/gnu-mirror-overlay.nix)
++      (import /build/fork-build-overlay.nix)
++    ];
++  }
++)
+diff --git a/contrib/attestation/package-builder/gen-package-nix.sh b/contrib/attestation/package-builder/gen-package-nix.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..d088c6aa2f8497daaa87129631bf0c48b46fc8fd
+--- /dev/null
++++ b/contrib/attestation/package-builder/gen-package-nix.sh
+@@ -0,0 +1,51 @@
++#!/usr/bin/env bash
++# Emit one .nix per package name (`--from-list runtime-attrs.txt` or listed attrs).
++set -euo pipefail
++
++NIXPKGS_EXPR="${NIXPKGS_EXPR:-/build/nixpkgs-with-overlay.nix}"
++
++emit() {
++  local outdir=$1 attr=$2
++  local safe="${attr//\./-}"
++  local out="${outdir}/${safe}.nix"
++
++  cat > "${out}" <<EOF
++# ${attr} — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import ${NIXPKGS_EXPR} }:
++
++pkgs.${attr}
++EOF
++  echo "    ${out}"
++}
++
++attrs_from_list() {
++  local file=$1
++  grep -v '^[[:space:]]*#' "$file" | grep -v '^[[:space:]]*$' | tr -d '\r'
++}
++
++if [ "${1:-}" = "--from-list" ]; then
++  LIST="${2:?list file required}"
++  OUTDIR="${3:?outdir required}"
++  mkdir -p "${OUTDIR}"
++  mapfile -t ATTRS < <(attrs_from_list "${LIST}")
++  [ "${#ATTRS[@]}" -gt 0 ] || { echo "ERROR: no attributes in ${LIST}" >&2; exit 1; }
++  echo "==> Generating ${#ATTRS[@]} package file(s) from ${LIST}"
++  for attr in "${ATTRS[@]}"; do
++    emit "${OUTDIR}" "${attr}"
++  done
++  printf '%s\n' "${ATTRS[@]}" > "${OUTDIR}/build-order.txt"
++  echo "==> Build order: ${OUTDIR}/build-order.txt"
++  exit 0
++fi
++
++OUTDIR="${1:?outdir required}"
++shift
++[ "$#" -gt 0 ] || { echo "ERROR: at least one nixpkgs attribute required" >&2; exit 1; }
++
++mkdir -p "${OUTDIR}"
++echo "==> Generating $# package file(s) in ${OUTDIR}"
++for attr in "$@"; do
++  emit "${OUTDIR}" "${attr}"
++done
++printf '%s\n' "$@" > "${OUTDIR}/build-order.txt"
++echo "==> Build order: ${OUTDIR}/build-order.txt"
+diff --git a/contrib/attestation/package-builder/gnu-mirror-overlay.nix b/contrib/attestation/package-builder/gnu-mirror-overlay.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..6dce902068495eaf873f6f0d6e54c1d2c70e7627
+--- /dev/null
++++ b/contrib/attestation/package-builder/gnu-mirror-overlay.nix
+@@ -0,0 +1,146 @@
++# Override gnu-config: Savannah *cgit* is broken; use vendored files in vendor/gnu-config/.
++# GNU master (ftp.gnu.org) RST / truncated HTTP 200 through the proxy. Prefer kernel.org
++# (and gcc mirrors) first; hash still enforces the same source bytes.
++final: prev:
++let
++  inherit (prev) lib;
++  guess = ./vendor/gnu-config/config.guess;
++  sub = ./vendor/gnu-config/config.sub;
++
++  stripKnown =
++    url:
++    let
++      steps = [
++        "https://ftpmirror.gnu.org/gnu/"
++        "http://ftpmirror.gnu.org/gnu/"
++        "https://ftpmirror.gnu.org/"
++        "http://ftpmirror.gnu.org/"
++        "https://ftp.gnu.org/gnu/"
++        "https://ftp.gnu.org/pub/gnu/"
++        "http://ftp.gnu.org/gnu/"
++        "https://mirrors.kernel.org/gnu/"
++        "https://ftp.nluug.nl/pub/gnu/"
++      ];
++      go =
++        u: prefixes:
++        if prefixes == [ ] then
++          u
++        else
++          let p = lib.head prefixes; in
++          if lib.hasPrefix p u then lib.removePrefix p u else go u (lib.tail prefixes);
++    in
++    go url steps;
++
++  isGnuSource =
++    url:
++    lib.hasPrefix "https://ftpmirror.gnu.org/" url
++    || lib.hasPrefix "http://ftpmirror.gnu.org/" url
++    || lib.hasPrefix "https://ftp.gnu.org/gnu/" url
++    || lib.hasPrefix "https://ftp.gnu.org/pub/gnu/" url
++    || lib.hasPrefix "http://ftp.gnu.org/gnu/" url
++    || lib.hasPrefix "https://mirrors.kernel.org/gnu/" url;
++
++  gnuAlts =
++    url:
++    let
++      p = stripKnown url;
++      gccRel =
++        if lib.hasPrefix "gcc/" p then
++          let rest = lib.removePrefix "gcc/" p; in [
++            "https://mirrors.kernel.org/gnu/gcc/${rest}"
++            "https://bigsearcher.com/mirrors/gcc/releases/${rest}"
++            "https://mirror.koddos.net/gcc/releases/${rest}"
++          ]
++        else
++          [ ];
++    in
++    gccRel
++    ++ [
++      "https://mirrors.kernel.org/gnu/${p}"
++      "https://ftp.nluug.nl/pub/gnu/${p}"
++      "https://ftp.gnu.org/gnu/${p}"
++      "https://ftp.gnu.org/pub/gnu/${p}"
++    ];
++
++  gnuRewrite = url: if isGnuSource url then "https://mirrors.kernel.org/gnu/${stripKnown url}" else url;
++
++  savannahPath =
++    url:
++    lib.removePrefix "https://download.savannah.gnu.org/releases/" (
++      lib.removePrefix "http://download.savannah.gnu.org/releases/" (
++        lib.removePrefix "https://download.savannah.nongnu.org/releases/" (
++          lib.removePrefix "http://download.savannah.nongnu.org/releases/" url
++        )
++      )
++    );
++
++  isSavannah =
++    url:
++    lib.hasPrefix "https://download.savannah.gnu.org/releases/" url
++    || lib.hasPrefix "http://download.savannah.gnu.org/releases/" url
++    || lib.hasPrefix "https://download.savannah.nongnu.org/releases/" url
++    || lib.hasPrefix "http://download.savannah.nongnu.org/releases/" url;
++
++  savannahAlts =
++    url:
++    let p = savannahPath url; in [
++      "https://mirror.csclub.uwaterloo.ca/nongnu/${p}"
++      "https://ftp.igh.cnrs.fr/pub/nongnu/${p}"
++      "https://mirror.netcologne.de/savannah/${p}"
++      "https://download.savannah.gnu.org/releases/${p}"
++    ];
++
++  savannahRewrite =
++    url: if isSavannah url then "https://mirror.csclub.uwaterloo.ca/nongnu/${savannahPath url}" else url;
++
++  rewriteURL = url: savannahRewrite (gnuRewrite url);
++
++  withGnuMirrors =
++    args:
++    if !(builtins.isAttrs args) then
++      args
++    else
++      let
++        orig = args.urls or (lib.optional ((args.url or "") != "") args.url);
++        extra = lib.concatMap (
++          u:
++          (if isGnuSource u then gnuAlts u else [ ])
++          ++ (if isSavannah u then savannahAlts u else [ ])
++        ) orig;
++      in
++      if extra == [ ] then
++        args
++      else
++        (builtins.removeAttrs args [ "url" ])
++        // {
++          urls = lib.unique (extra ++ orig);
++        };
++
++  fetchurl' = prev.fetchurl.override { rewriteURL = rewriteURL; };
++in
++{
++  fetchurl = args: fetchurl' (withGnuMirrors args);
++
++  gnu-config = prev.gnu-config.overrideAttrs (_: {
++    unpackPhase = ''
++      runHook preUnpack
++      cp ${guess} ./config.guess
++      cp ${sub} ./config.sub
++      chmod +w ./config.sub ./config.guess
++      runHook postUnpack
++    '';
++  });
++
++  gnutar = prev.gnutar.overrideAttrs (old: {
++    env = (old.env or { }) // {
++      FORCE_UNSAFE_CONFIGURE = "1";
++    };
++  });
++
++  coreutils = prev.coreutils.overrideAttrs (old: {
++    env = (old.env or { }) // {
++      FORCE_UNSAFE_CONFIGURE = "1";
++    };
++    doCheck = false;
++  });
++}
+diff --git a/contrib/attestation/package-builder/jo.nix b/contrib/attestation/package-builder/jo.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..c59b86088e25c5238941e00e29cd1bd28f558313
+--- /dev/null
++++ b/contrib/attestation/package-builder/jo.nix
+@@ -0,0 +1,31 @@
++# jo 1.7 from vendor/jo-src; import overlay nixpkgs, not <nixpkgs>.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.stdenv.mkDerivation rec {
++  pname = "jo";
++  version = "1.7";
++
++  src = ./vendor/jo-src;
++
++  # pkg-config supplies pkg.m4 for PKG_PROG_PKG_CONFIG in configure.ac.
++  nativeBuildInputs = [
++    pkgs.autoreconfHook
++    pkgs.pkg-config
++  ];
++
++  buildInputs = [ pkgs.bash-completion ];
++
++  installPhase = ''
++    runHook preInstall
++    mkdir -p $out/bin
++    install -m 0755 jo $out/bin/jo
++    runHook postInstall
++  '';
++
++  meta = with pkgs.lib; {
++    description = "Small utility to create JSON objects from the shell";
++    homepage = "https://github.com/jpmens/jo";
++    license = licenses.gpl3Only;
++    platforms = platforms.unix;
++  };
++}
+diff --git a/contrib/attestation/package-builder/nix-docker.conf b/contrib/attestation/package-builder/nix-docker.conf
+new file mode 100644
+index 0000000000000000000000000000000000000000..c003d43e3029eae03309d2b6764b1f46ec4fa96e
+--- /dev/null
++++ b/contrib/attestation/package-builder/nix-docker.conf
+@@ -0,0 +1,26 @@
++# Attestation-enabled Nix configuration for TEE builds.
++sandbox = false
++filter-syscalls = false
++experimental-features = nix-command flakes
++# Must stay set: nixos/nix ships nixbld1..32. Empty here makes builders run as
++# root, and configure scripts in coreutils/tar refuse to run as root.
++build-users-group = nixbld
++# Hard requirement: no binary cache substitution (TEE attestation policy).
++substitute = false
++max-jobs = 4
++cores = 0
++ssl-cert-file = /etc/nix/ca-bundle.crt
++# Source mirror for tarballs when ftpmirror.gnu.org 502/504s (NOT cache.nixos.org).
++# gnu-config Savannah cgit is overridden by gnu-mirror-overlay.nix (vendored files).
++hashed-mirrors = https://tarballs.nixos.org
++download-attempts = 50
++connect-timeout = 60
++stalled-download-timeout = 600
++
++# TEE attestation (requires attestation-enabled Nix fork)
++# Uncomment after installing the fork and attestation tools:
++# require-attestation = true
++# attestation-store = /var/lib/nix-attestations
++# attestation-verifier = /usr/local/bin/nix-attestation-verify
++# post-build-hook = /usr/local/bin/nix-certifier
++# attestation-bootstrap-inputs = sha256-... sha256-...
+diff --git a/contrib/attestation/package-builder/nix-fork-classic.nix b/contrib/attestation/package-builder/nix-fork-classic.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..591da5d76ed5b28c9ca58d57f1b8fb33c690c536
+--- /dev/null
++++ b/contrib/attestation/package-builder/nix-fork-classic.nix
+@@ -0,0 +1,121 @@
++# Build the Nix fork without flakes — nixpkgs 26.05 (same line as flake.nix).
++{ system ? builtins.currentSystem }:
++
++let
++  nixSrc = /nix-src;
++  officialRelease = false;
++  inputs = { };
++
++  pkgsBase = import /build/fork-nixpkgs { inherit system; };
++  inherit (pkgsBase) lib;
++
++  src = builtins.path {
++    path = nixSrc;
++    name = "nix";
++  };
++
++  packageSetsFor =
++    args@{
++      pkgs,
++      getStdenv ? pkgs: pkgs.stdenv,
++    }:
++    let
++      nixComponentsSplices = lib.mapCrossIndex (
++        pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixComponents
++      ) (lib.renameCrossIndexFrom "pkgs" pkgs);
++
++      nixDependenciesSplices = lib.mapCrossIndex (
++        pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixDependencies
++      ) (lib.renameCrossIndexFrom "pkgs" pkgs);
++
++      nixComponents =
++        lib.makeScopeWithSplicing'
++          {
++            inherit (pkgs) splicePackages;
++            inherit (nixDependencies) newScope;
++          }
++          {
++            otherSplices = lib.renameCrossIndexTo "self" nixComponentsSplices;
++            f = import "${nixSrc}/packaging/components.nix" {
++              inherit (pkgs) lib;
++              inherit officialRelease pkgs src;
++              maintainers = [ ];
++            };
++          };
++
++      nixDependencies =
++        lib.makeScopeWithSplicing'
++          {
++            inherit (pkgs) splicePackages;
++            inherit (pkgs) newScope;
++          }
++          {
++            otherSplices = lib.renameCrossIndexTo "self" nixDependenciesSplices;
++            f = import "${nixSrc}/packaging/dependencies.nix" {
++              inherit inputs pkgs;
++              stdenv = getStdenv pkgs;
++            };
++          };
++
++      fixup = attrs: if !(pkgs ? nix) then { } else attrs;
++    in
++    fixup {
++      inherit nixComponents nixDependencies;
++    };
++
++  overlayFor =
++    getStdenv: final: prev:
++    let
++      packageSets = packageSetsFor {
++        inherit getStdenv;
++        pkgs = final;
++      };
++    in
++    {
++      nixComponents2 = packageSets.nixComponents;
++      nixDependencies2 = packageSets.nixDependencies;
++      nix = packageSets.nixComponents.nix-cli;
++    };
++
++  pkgs = import /build/fork-nixpkgs {
++    inherit system;
++    overlays = [ (overlayFor (p: p.stdenv)) ];
++  };
++
++  nixComponents = pkgs.nixComponents2.overrideScope (
++    _: prev:
++    {
++      withUnityBuild = false;
++      nix-store = prev.nix-store.override {
++        withAWS = false;
++        sandboxShell = "${pkgs.busybox-sandbox-shell}/bin/busybox";
++      };
++    }
++  );
++
++  devFlakeStub = {
++    getSystem =
++      _:
++      {
++        pre-commit.settings = {
++          rawConfig = { repos = [ ]; };
++          package = pkgs.writeShellScriptBin "pre-commit" "exit 0";
++          installationScript = "true";
++        };
++      };
++  };
++
++  shell = (import "${nixSrc}/packaging/dev-shell.nix" {
++    inherit (pkgs) lib;
++    devFlake = devFlakeStub;
++  }) {
++    inherit pkgs;
++    inherit nixComponents;
++  };
++
++in
++{
++  inherit pkgs nixComponents shell;
++  nix-cli = nixComponents.nix-cli;
++  default = nixComponents.nix-cli;
++}
+diff --git a/contrib/attestation/package-builder/nixpkgs-with-overlay.nix b/contrib/attestation/package-builder/nixpkgs-with-overlay.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..e79baaa93d05303b5c1e49a0f15382a992ad42f5
+--- /dev/null
++++ b/contrib/attestation/package-builder/nixpkgs-with-overlay.nix
+@@ -0,0 +1,5 @@
++# Global nixpkgs import with corporate/Zscaler-safe overlays.
++# Use for every nix-env / nix-build in Docker — not only jo.nix.
++import /nixpkgs {
++  overlays = [ (import /build/gnu-mirror-overlay.nix) ];
++}
+diff --git a/contrib/attestation/package-builder/nokia-runner/.gitignore b/contrib/attestation/package-builder/nokia-runner/.gitignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..41e833ff6d7f465c511510e54eed07bec28fd47f
+--- /dev/null
++++ b/contrib/attestation/package-builder/nokia-runner/.gitignore
+@@ -0,0 +1,4 @@
++# Staged by stage-nokia-runner.sh; only the Dockerfile is source.
++*
++!Dockerfile
++!.gitignore
+diff --git a/contrib/attestation/package-builder/nokia-runner/Dockerfile b/contrib/attestation/package-builder/nokia-runner/Dockerfile
+new file mode 100644
+index 0000000000000000000000000000000000000000..4de0a1999f654f67268041250da7a93b0e19f225
+--- /dev/null
++++ b/contrib/attestation/package-builder/nokia-runner/Dockerfile
+@@ -0,0 +1,57 @@
++# Nokia cert runner: one nix-build per runtime package (own cert later), then jo.
++#
++# test_docker.py tars nokia-runner/ and uses the classic Docker API
++# (no BuildKit). Do not add RUN --mount=type=cache here — that syntax
++# fails on the cert runner. The compile-time Nix store cache lives only
++# on nix-tee-base (./build.sh).
++# Stage: ./stage-nokia-runner.sh
++#
++# glibc's .nix and this Dockerfile are the pattern: template + ordered loop.
++# Later packages reuse earlier store paths as inputs (verification graph).
++# Export writes one manifest per package — deps are not folded into jo's cert.
++
++FROM nix-tee-base
++
++ARG http_proxy=
++ARG https_proxy=
++
++WORKDIR /build
++
++COPY jo.nix nixpkgs-with-overlay.nix gnu-mirror-overlay.nix /build/
++COPY packages /build/packages
++COPY vendor /build/vendor
++
++RUN set -eux; \
++    for f in /build/jo.nix /build/nixpkgs-with-overlay.nix /build/gnu-mirror-overlay.nix \
++             /build/packages/*.nix /build/packages/build-order.txt; do \
++      [ -f "$f" ] || continue; \
++      tr -d '\r' < "$f" > "$f.lf"; mv "$f.lf" "$f"; \
++    done
++
++RUN set -eux; \
++    mkdir -p /build/results; \
++    while read -r attr; do \
++      [ -n "$attr" ] || continue; \
++      safe="$(echo "$attr" | tr '.' '-')"; \
++      f="/build/packages/${safe}.nix"; \
++      [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }; \
++      echo "==> runtime package $attr"; \
++      nix-build "$f" -o "/build/results/${safe}" \
++        --option substitute false \
++        --option ssl-cert-file /etc/nix/ca-bundle.crt; \
++    done < /build/packages/build-order.txt
++
++RUN set -eux; \
++    echo "==> jo"; \
++    nix-build /build/jo.nix -o /build/results/jo \
++      --option substitute false \
++      --option ssl-cert-file /etc/nix/ca-bundle.crt; \
++    ln -sfn /build/results/jo /result
++
++# After nix-build so export-script edits do not rebuild packages.
++COPY export-closure.sh /build/export-closure.sh
++RUN tr -d '\r' < /build/export-closure.sh > /build/export-closure.sh.lf \
++    && mv /build/export-closure.sh.lf /build/export-closure.sh \
++    && chmod +x /build/export-closure.sh
++
++CMD ["/build/export-closure.sh", "/tmp/outputs", "/build/results"]
+diff --git a/contrib/attestation/package-builder/packages/bash-completion.nix b/contrib/attestation/package-builder/packages/bash-completion.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..81c81b065aa18ba7d8ca35f9c742b48bf345a5a6
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/bash-completion.nix
+@@ -0,0 +1,4 @@
++# bash-completion — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.bash-completion
+diff --git a/contrib/attestation/package-builder/packages/bash.nix b/contrib/attestation/package-builder/packages/bash.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..070e6ce0fd9552ef70f9b3b58cbe1119439790a2
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/bash.nix
+@@ -0,0 +1,4 @@
++# bash — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.bash
+diff --git a/contrib/attestation/package-builder/packages/build-order.txt b/contrib/attestation/package-builder/packages/build-order.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..079824d962daa6c19c18f67aaae7ee18abab3e53
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/build-order.txt
+@@ -0,0 +1,7 @@
++glibc
++gcc.cc.lib
++tzdata
++ncurses
++readline
++bash
++bash-completion
+diff --git a/contrib/attestation/package-builder/packages/gcc-cc-lib.nix b/contrib/attestation/package-builder/packages/gcc-cc-lib.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..57b2442d067e17942d1004b533abd3982665f39d
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/gcc-cc-lib.nix
+@@ -0,0 +1,4 @@
++# gcc.cc.lib — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.gcc.cc.lib
+diff --git a/contrib/attestation/package-builder/packages/glibc.nix b/contrib/attestation/package-builder/packages/glibc.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..790b75c31415e1ead6f623241e42aa1e670a16d2
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/glibc.nix
+@@ -0,0 +1,4 @@
++# glibc — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.glibc
+diff --git a/contrib/attestation/package-builder/packages/ncurses.nix b/contrib/attestation/package-builder/packages/ncurses.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..293543b4832e7ff355ed0b161145ec49a32a21a4
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/ncurses.nix
+@@ -0,0 +1,4 @@
++# ncurses — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.ncurses
+diff --git a/contrib/attestation/package-builder/packages/readline.nix b/contrib/attestation/package-builder/packages/readline.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f8548e681764aebbd21288fad8040afd3dab22e
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/readline.nix
+@@ -0,0 +1,4 @@
++# readline — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.readline
+diff --git a/contrib/attestation/package-builder/packages/runtime-attrs.txt b/contrib/attestation/package-builder/packages/runtime-attrs.txt
+new file mode 100644
+index 0000000000000000000000000000000000000000..009ceeb463b9d4823e8602a1cd90d7f0368cf7d9
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/runtime-attrs.txt
+@@ -0,0 +1,15 @@
++# jo's runtime dependency attributes, bottom-up.
++# One name per line. gen-package-nix.sh fills packages/*.nix from a template.
++#
++# Build-time tools (autoreconfHook, pkg-config, gcc compiler) stay out.
++# Compiler runtime is gcc.cc.lib (libgcc_s), not gcc.
++#
++# After the first successful jo build, `nix-store -qR /result` can show extra
++# paths — add the matching nixpkgs attr here and re-run the generator.
++glibc
++gcc.cc.lib
++tzdata
++ncurses
++readline
++bash
++bash-completion
+diff --git a/contrib/attestation/package-builder/packages/tzdata.nix b/contrib/attestation/package-builder/packages/tzdata.nix
+new file mode 100644
+index 0000000000000000000000000000000000000000..efa0e00f7f5fb284b47a1ce238bfeda232b0fba8
+--- /dev/null
++++ b/contrib/attestation/package-builder/packages/tzdata.nix
+@@ -0,0 +1,4 @@
++# tzdata — generated by gen-package-nix.sh, do not edit by hand.
++{ pkgs ? import /build/nixpkgs-with-overlay.nix }:
++
++pkgs.tzdata
+diff --git a/contrib/attestation/package-builder/prefetch.sh b/contrib/attestation/package-builder/prefetch.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..838080bf10a7a00f5179342f747e88c6c5f01d4e
+--- /dev/null
++++ b/contrib/attestation/package-builder/prefetch.sh
+@@ -0,0 +1,461 @@
++#!/usr/bin/env bash
++# All prefetch logic in one place (nixos/nix Docker image, nixpkgs 26.05).
++#
++# Usage:
++#   prefetch.sh fork            — bootstrap seeds + busybox tarball (nix-tee-base compile)
++#   prefetch.sh jo              — jo source into vendor/ (package-builder stage)
++#   prefetch.sh vendor-busybox  — download busybox tarball on host into vendor/
++set -euo pipefail
++
++: "${SSL_CERT_FILE:=/etc/nix/ca-bundle.crt}"
++: "${NIXPKGS:=/nixpkgs}"
++
++NIX_OPTS=(--option substitute false --option ssl-cert-file "${SSL_CERT_FILE}")
++
++# Bootstrap files: hashes follow the unpacked /nixpkgs stdenv (26.05). If they
++# drift, prefetch warns and the real build fetches them itself.
++BOOTSTRAP_TOOLS_URL="http://tarballs.nixos.org/stdenv/x86_64-unknown-linux-gnu/82b583ba2ba2e5706b35dbe23f31362e62be2a9d/bootstrap-tools.tar.xz"
++BOOTSTRAP_TOOLS_HASH="sha256-YQlr088HPoVWBU2jpPhpIMyOyoEDZYDw1y60SGGbUM0="
++BOOTSTRAP_BUSYBOX_URL="http://tarballs.nixos.org/stdenv/x86_64-unknown-linux-gnu/82b583ba2ba2e5706b35dbe23f31362e62be2a9d/busybox"
++BOOTSTRAP_BUSYBOX_HASH="sha256-QrTEnQTBM1Y/qV9odq8irZkQSD9uOMbs2Q5NgCvKCNQ="
++
++BUSYBOX_TARBALL_HASH="sha256-uMwkyVdNgJ5yecO+NJeVxdXOtv3xnKcJ+AzeUOR94xQ="
++BUSYBOX_VENDOR="/build/vendor/busybox-1.36.1.tar.bz2"
++
++# 26.05 stdenv source-bootstrap (tinycc-musl). repo.or.cz cgit snapshots are not
++# stable FODs — tarballs.nixos.org does not mirror this file.
++TINYCC_REV="cb41cbfe717e4c00d7bb70035cda5ee5f0ff9341"
++TINYCC_URL="https://repo.or.cz/tinycc.git/snapshot/${TINYCC_REV}.tar.gz"
++# Must match fetchurl `name` (basename) so --add-fixed hits the FOD path.
++TINYCC_VENDOR="/build/vendor/tinycc-${TINYCC_REV}.tar.gz"
++TINYCC_FILE_URL="file://${TINYCC_VENDOR}"
++# Literal in musl.nix/mes.nix (Nix interpolates ${rev}).
++TINYCC_NIX_URL='https://repo.or.cz/tinycc.git/snapshot/${rev}.tar.gz'
++TINYCC_HASH_PINNED="sha256-MRuqq3TKcfIahtUWdhAcYhqDiGPkAjS8UTMsDE+/jGU="
++
++JO_VERSION=1.7
++# GitHub auto-generated archives are not a stable FOD; pin updated 2026-09-10
++# from the bytes curl actually got (was sha256-uJUbe593k7ENfbKCFhmm4Io0CPB109LF9EH8Qw0BFiY=).
++JO_HASH="sha256-FYKEcsy5xGTIAJmoWaJUoVHg9JtmA3A5ipeJDqUkMPk="
++JO_URL="https://github.com/jpmens/jo/archive/${JO_VERSION}.tar.gz"
++JO_OUT=/build/vendor/jo-src
++
++sri_to_base64() {
++  printf '%s' "${1#sha256-}"
++}
++
++nix_fetchurl() {
++  local hash="$1"
++  local url="$2"
++  local b64
++  b64=$(sri_to_base64 "${hash}")
++  nix-build '<nix/fetchurl.nix>' \
++    --argstr url "${url}" \
++    --argstr sha256 "${b64}" \
++    --no-out-link \
++    "${NIX_OPTS[@]}"
++}
++
++# Executable bootstrap busybox — curl+chmod cannot match FOD hash; use builtin fetchurl.
++nix_fetch_executable() {
++  local hash="$1"
++  local url="$2"
++  nix-instantiate --eval --raw -E "
++    builtins.fetchurl {
++      url = \"${url}\";
++      hash = \"${hash}\";
++      executable = true;
++    }
++  "
++}
++
++mirror_http_https() {
++  printf '%s\n' "$1"
++  case "$1" in
++    http://*) printf '%s\n' "https://${1#http://}" ;;
++    https://*) printf '%s\n' "http://${1#https://}" ;;
++  esac
++}
++
++try_urls_fetchurl() {
++  local hash="$1"
++  local name="$2"
++  shift 2
++  local urls=("$@")
++  local url path
++
++  echo "==> Prefetch: ${name}" >&2
++  for url in "${urls[@]}"; do
++    echo "    fetchurl: ${url}" >&2
++    if path=$(nix_fetchurl "${hash}" "${url}" 2>/dev/null); then
++      echo "    ok -> ${path}" >&2
++      printf '%s' "${path}"
++      return 0
++    fi
++  done
++  return 1
++}
++
++append_bootstrap_hashes() {
++  local tools_path="$1"
++  local busybox_path="$2"
++  local conf=/etc/nix/nix.conf
++  local line has=0
++  local tools_hash busybox_hash
++
++  tools_hash=$(nix hash path --sri "${tools_path}")
++  busybox_hash=$(nix hash path --sri "${busybox_path}")
++
++  echo "==> Bootstrap attestation hashes:"
++  echo "  tools:   ${tools_hash}"
++  echo "  busybox: ${busybox_hash}"
++
++  if [ -f "${conf}" ]; then
++    while IFS= read -r line || [ -n "${line}" ]; do
++      case "${line}" in attestation-bootstrap-inputs*) has=1; break ;; esac
++    done < "${conf}"
++  fi
++  if [ "${has}" -eq 0 ]; then
++    echo "attestation-bootstrap-inputs = ${tools_hash} ${busybox_hash}" >> "${conf}"
++  fi
++}
++
++# nixos/nix image has no sed/grep; rewrite in bash.
++replace_string_in_file() {
++  local src="$1" old="$2" new="$3"
++  local out line found=0
++  out=$(mktemp)
++  while IFS= read -r line || [ -n "${line}" ]; do
++    if [[ "${line}" == *"${old}"* ]]; then
++      found=1
++      line="${line//"${old}"/"${new}"}"
++    fi
++    printf '%s\n' "${line}"
++  done < "${src}" > "${out}"
++  if [ "${found}" -eq 0 ]; then
++    rm -f "${out}"
++    return 1
++  fi
++  cat "${out}" > "${src}"
++  rm -f "${out}"
++}
++
++# Bootstrap ungz + untar: simple gzip + ustar, top dir tinycc-<7-char rev>.
++# repo.or.cz "snapshot.tar.gz" is often HTML or uncompressed tar, not gzip.
++pack_tinycc_for_ungz() {
++  local dest="$1"
++  local work top want tarpath
++  want="tinycc-${TINYCC_REV:0:7}"
++  work=$(mktemp -d)
++  mkdir -p "${work}/in" "${work}/out"
++
++  if gzip -t "${dest}" 2>/dev/null; then
++    gzip -dc "${dest}" | tar -C "${work}/in" -xf -
++  elif tar -tf "${dest}" >/dev/null 2>&1; then
++    echo "    note: download was tar, not gzip (cgit/HTML-or-raw-tar)"
++    tar -C "${work}/in" -xf "${dest}"
++  else
++    echo "ERROR: TinyCC download is not gzip or tar (likely HTML). First bytes:" >&2
++    head -c 240 "${dest}" >&2 || true
++    echo >&2
++    rm -rf "${work}"
++    exit 1
++  fi
++
++  top=$(cd "${work}/in" && printf '%s' *)
++  if [ ! -d "${work}/in/${top}" ]; then
++    echo "ERROR: TinyCC archive has no top directory (${top})" >&2
++    rm -rf "${work}"
++    exit 1
++  fi
++  mv "${work}/in/${top}" "${work}/out/${want}"
++
++  tarpath="${work}/tinycc.tar"
++  if tar --format=ustar -C "${work}/out" -cf "${tarpath}" "${want}" 2>/dev/null; then
++    :
++  else
++    tar -C "${work}/out" -cf "${tarpath}" "${want}"
++  fi
++  gzip -n -1 -c "${tarpath}" > "${dest}"
++  rm -rf "${work}"
++}
++
++download_tinycc() {
++  local dest="$1" url sz
++  for url in \
++    "https://codeload.github.com/TinyCC/tinycc/tar.gz/${TINYCC_REV}" \
++    "https://github.com/TinyCC/tinycc/archive/${TINYCC_REV}.tar.gz" \
++    "${TINYCC_URL}"; do
++    echo "    fetch ${url}"
++    if curl -fsSL --retry 8 --retry-all-errors --cacert "${SSL_CERT_FILE}" \
++        -o "${dest}" "${url}"; then
++      sz=$(wc -c < "${dest}")
++      if [ "${sz}" -gt 50000 ]; then
++        echo "    bytes ${sz}"
++        return 0
++      fi
++      echo "    too small (${sz}), skip" >&2
++    fi
++  done
++  return 1
++}
++
++pin_tinycc_snapshot() {
++  local actual f
++  echo "==> Prefetch: tinycc ${TINYCC_REV} (GitHub/cgit → ustar+gzip for ungz)"
++  mkdir -p /build/vendor
++  if ! download_tinycc "${TINYCC_VENDOR}"; then
++    echo "ERROR: tinycc download failed" >&2
++    exit 1
++  fi
++  pack_tinycc_for_ungz "${TINYCC_VENDOR}"
++  actual=$(nix hash file --sri "${TINYCC_VENDOR}")
++  echo "    sri ${actual}"
++  echo "    vendor ${TINYCC_VENDOR}"
++  for f in \
++    "${NIXPKGS}/pkgs/os-specific/linux/minimal-bootstrap/tinycc/musl.nix" \
++    "${NIXPKGS}/pkgs/os-specific/linux/minimal-bootstrap/tinycc/mes.nix"; do
++    if [ ! -f "${f}" ]; then
++      echo "ERROR: missing ${f}" >&2
++      exit 1
++    fi
++    if ! replace_string_in_file "${f}" "${TINYCC_NIX_URL}" "${TINYCC_FILE_URL}"; then
++      echo "ERROR: failed to rewrite tinycc url in ${f}" >&2
++      exit 1
++    fi
++    if ! replace_string_in_file "${f}" "${TINYCC_HASH_PINNED}" "${actual}"; then
++      echo "ERROR: failed to pin tinycc hash in ${f}" >&2
++      exit 1
++    fi
++  done
++  nix-store --add-fixed sha256 "${TINYCC_VENDOR}" >/dev/null
++  echo "    ok (ustar + simple gzip for ungz/untar)"
++}
++
++# stdenv bootstrap hardcodes ftpmirror; overlay may not apply there.
++# Do not pin to ftp.gnu.org (RST / truncated 200 through the proxy) — use kernel.org.
++pin_gnu_ftpmirror() {
++  local f n=0
++  echo "==> Pinning GNU sources off ftpmirror.gnu.org -> mirrors.kernel.org/gnu/"
++  shopt -s globstar nullglob
++  for f in \
++    "${NIXPKGS}/pkgs/build-support/fetchurl/mirrors.nix" \
++    "${NIXPKGS}/pkgs/os-specific/linux/minimal-bootstrap/"**/*.nix \
++    "${NIXPKGS}/pkgs/stdenv/"**/*.nix; do
++    [ -f "${f}" ] || continue
++    if replace_string_in_file "${f}" "https://ftpmirror.gnu.org/" "https://mirrors.kernel.org/gnu/"; then
++      n=$((n + 1))
++    fi
++    if replace_string_in_file "${f}" "http://ftpmirror.gnu.org/" "https://mirrors.kernel.org/gnu/"; then
++      n=$((n + 1))
++    fi
++    if replace_string_in_file "${f}" "https://ftp.gnu.org/gnu/" "https://mirrors.kernel.org/gnu/"; then
++      n=$((n + 1))
++    fi
++  done
++  echo "    rewrote ${n} file hits (ok if some files had no GNU URL)"
++}
++
++pin_savannah() {
++  local f n=0
++  echo "==> Pinning Savannah sources -> mirror.csclub.uwaterloo.ca (nyacc etc.)"
++  shopt -s globstar nullglob
++  for f in \
++    "${NIXPKGS}/pkgs/build-support/fetchurl/mirrors.nix" \
++    "${NIXPKGS}/pkgs/os-specific/linux/minimal-bootstrap/"**/*.nix; do
++    [ -f "${f}" ] || continue
++    if replace_string_in_file "${f}" "https://download.savannah.gnu.org/releases/" "https://mirror.csclub.uwaterloo.ca/nongnu/"; then
++      n=$((n + 1))
++    fi
++    if replace_string_in_file "${f}" "https://download.savannah.nongnu.org/releases/" "https://mirror.csclub.uwaterloo.ca/nongnu/"; then
++      n=$((n + 1))
++    fi
++  done
++  echo "    rewrote ${n} savannah URL hits"
++}
++
++# 26.05 source stdenv needs this recursive FOD in the store. It is *source* (git
++# tree), not a Hydra binary. The .drv has no real builder — only a help text.
++pin_stage0_posix() {
++  local dest="/build/vendor/stage0-posix-1.9.1-source"
++  local expected="sha256-UNoyb2teqH26VM7YoOcazyqZ0AlDae045aWc31ZHFdw="
++  local actual srcnix d
++  echo "==> Prefetch: stage0-posix 1.9.1 sources (recursive FOD)"
++  rm -rf "${dest}"
++  git clone --depth 1 --recurse-submodules --shallow-submodules \
++    --branch Release_1.9.1 \
++    https://github.com/oriansj/stage0-posix.git "${dest}"
++  shopt -s globstar nullglob
++  for d in "${dest}/.git" "${dest}"/**/.git; do
++    rm -rf "${d}"
++  done
++  actual=$(nix hash path --sri "${dest}")
++  echo "    sri ${actual}"
++  nix-store --add-fixed --recursive sha256 "${dest}" >/dev/null
++  if [ "${actual}" != "${expected}" ]; then
++    srcnix="${NIXPKGS}/pkgs/os-specific/linux/minimal-bootstrap/stage0-posix/bootstrap-sources.nix"
++    echo "==> Pinning stage0 FOD hash (git tree vs nixpkgs packing)"
++    if ! replace_string_in_file "${srcnix}" "${expected}" "${actual}"; then
++      echo "ERROR: failed to pin stage0 hash in ${srcnix}" >&2
++      exit 1
++    fi
++  fi
++  echo "    ok (in store as ${dest##*/})"
++}
++
++prefetch_fork() {
++  local tools_urls=() busybox_urls=() u path actual
++  local tools_path busybox_path
++
++  echo "==> Prefetch for Nix fork compile (substitute=false)"
++
++  for p in \
++    /build/vendor/busybox-patches/CVE-2022-48174.patch \
++    /build/vendor/busybox-patches/CVE-2023-42366.patch \
++    /build/vendor/busybox-patches/CVE-2023-42363.patch \
++    /build/vendor/busybox-patches/CVE-2023-42364_CVE-2023-42365.patch \
++    /build/vendor/busybox-patches/CVE-2023-39810.patch \
++    /build/vendor/busybox-patches/CVE-2026-26157_CVE-2026-26158.patch \
++    /build/vendor/busybox-patches/CVE-2026-26157_CVE-2026-26158-2.patch \
++    /build/vendor/busybox-patches/apply-cve-2026.sh \
++    /build/vendor/busybox-patches/unsafe_prefix-cve-2026.c \
++    /build/vendor/unzip-patches/CVE-2021-4217.patch; do
++    if [ ! -f "${p}" ]; then
++      echo "ERROR: missing vendored patch ${p}" >&2
++      exit 1
++    fi
++  done
++  echo "==> Vendored dead-URL busybox patches present"
++
++  echo "==> Prefetch: nixpkgs busybox patches (alpine/github mirrors)"
++  try_urls_fetchurl "sha256-yviw1GV+t9tbHbY7YNxEqPi7xEreiXVqbeRyf8c6Awo=" "busybox-p0001" \
++    "https://raw.githubusercontent.com/alpinelinux/aports/ed92963eb55bbc8d938097b9ccb3e221a94653f4/main/busybox/0001-libbb-sockaddr2str-ensure-only-printable-characters-.patch" \
++    >/dev/null || true
++  try_urls_fetchurl "sha256-vl1wPbsHtXY9naajjnTicQ7Uj3N+EQ8pRNnrdsiow+w=" "busybox-p0002" \
++    "https://raw.githubusercontent.com/alpinelinux/aports/ed92963eb55bbc8d938097b9ccb3e221a94653f4/main/busybox/0002-nslookup-sanitize-all-printed-strings-with-printable.patch" \
++    >/dev/null || true
++
++  while IFS= read -r u; do tools_urls+=("${u}"); done < <(mirror_http_https "${BOOTSTRAP_TOOLS_URL}")
++  if tools_path=$(try_urls_fetchurl "${BOOTSTRAP_TOOLS_HASH}" "bootstrap-tools" "${tools_urls[@]}"); then
++    :
++  else
++    echo "WARNING: bootstrap-tools prefetch failed" >&2
++    tools_path=""
++  fi
++
++  echo "==> Prefetch: bootstrap-busybox (executable)"
++  busybox_path=""
++  busybox_urls=()
++  while IFS= read -r u; do busybox_urls+=("${u}"); done < <(mirror_http_https "${BOOTSTRAP_BUSYBOX_URL}")
++  for u in "${busybox_urls[@]}"; do
++    echo "    builtins.fetchurl: ${u}"
++    if busybox_path=$(nix_fetch_executable "${BOOTSTRAP_BUSYBOX_HASH}" "${u}" 2>/dev/null); then
++      echo "    ok -> ${busybox_path}"
++      break
++    fi
++  done
++  if [ -z "${busybox_path:-}" ]; then
++    echo "WARNING: bootstrap busybox prefetch failed (non-fatal for fork compile)" >&2
++  fi
++
++  if [ -n "${tools_path:-}" ] && [ -n "${busybox_path:-}" ]; then
++    append_bootstrap_hashes "${tools_path}" "${busybox_path}"
++  fi
++
++  if [ -f "${BUSYBOX_VENDOR}" ]; then
++    echo "==> Prefetch: busybox tarball (vendor)"
++    actual=$(nix hash file --sri "${BUSYBOX_VENDOR}")
++    if [ "${actual}" != "${BUSYBOX_TARBALL_HASH}" ]; then
++      echo "ERROR: vendored busybox hash mismatch" >&2
++      exit 1
++    fi
++    path=$(nix-store --add-fixed sha256 "${BUSYBOX_VENDOR}")
++    echo "    ok -> ${path}"
++  else
++    try_urls_fetchurl "${BUSYBOX_TARBALL_HASH}" "busybox-1.36.1.tar.bz2" \
++      "https://busybox.net/downloads/busybox-1.36.1.tar.bz2" \
++      "https://www.busybox.net/downloads/busybox-1.36.1.tar.bz2" \
++      "https://deb.debian.org/debian/pool/main/b/busybox/busybox_1.36.1.orig.tar.bz2" \
++      >/dev/null || exit 1
++  fi
++
++  pin_tinycc_snapshot
++  pin_gnu_ftpmirror
++  pin_savannah
++  pin_stage0_posix
++
++  echo "==> Prefetch: zstd (github archive — HTTP/2 flake through Zscaler)"
++  try_urls_fetchurl "sha256-qcd92hQqVBjMT3hyntjcgk29o9wGQsg5Hg7HE5C0UNc=" "zstd-1.5.6" \
++    "https://github.com/facebook/zstd/archive/v1.5.6.tar.gz" \
++    "https://codeload.github.com/facebook/zstd/tar.gz/v1.5.6" \
++    >/dev/null || echo "WARNING: zstd-1.5.6 prefetch failed" >&2
++  try_urls_fetchurl "sha256-tNFWIT9ydfozB8dWcmTMuZLCQmQudTFJIkSr0aG7S44=" "zstd-1.5.7" \
++    "https://github.com/facebook/zstd/archive/v1.5.7.tar.gz" \
++    "https://codeload.github.com/facebook/zstd/tar.gz/v1.5.7" \
++    >/dev/null || echo "WARNING: zstd-1.5.7 prefetch failed" >&2
++
++  echo "==> Fork prefetch done"
++}
++
++prefetch_jo() {
++  local tmp actual dest
++  dest="${JO_OUT}"
++  if [ ! -d /build/vendor ]; then
++    dest="$(cd "$(dirname "$0")" && pwd)/vendor/jo-src"
++  fi
++  if [ -f "${dest}/jo.c" ]; then
++    echo "==> Using vendored jo source at ${dest} (skip GitHub)"
++    return 0
++  fi
++  echo "==> Prefetching jo ${JO_VERSION} source"
++  tmp=$(mktemp)
++  curl -fsSL --cacert "${SSL_CERT_FILE}" -o "${tmp}" "${JO_URL}"
++  actual=$(nix hash file --sri "${tmp}")
++  if [ "${actual}" != "${JO_HASH}" ]; then
++    echo "ERROR: jo hash mismatch" >&2
++    echo "  expected: ${JO_HASH}" >&2
++    echo "  got:      ${actual}" >&2
++    exit 1
++  fi
++  rm -rf "${dest}"
++  mkdir -p "$(dirname "${dest}")"
++  tar -xzf "${tmp}" -C "$(dirname "${dest}")"
++  mv "$(dirname "${dest}")/jo-${JO_VERSION}" "${dest}"
++  rm -f "${tmp}"
++  echo "==> jo source ready at ${dest}"
++}
++
++prefetch_vendor_busybox() {
++  local root out actual
++  root="$(cd "$(dirname "$0")" && pwd)"
++  out="${root}/vendor/busybox-1.36.1.tar.bz2"
++  mkdir -p "${root}/vendor"
++
++  for url in \
++    "https://busybox.net/downloads/busybox-1.36.1.tar.bz2" \
++    "https://deb.debian.org/debian/pool/main/b/busybox/busybox_1.36.1.orig.tar.bz2"; do
++    echo "==> Trying ${url}"
++    if curl -fsSL --retry 5 -o "${out}" "${url}"; then
++      if command -v nix >/dev/null 2>&1; then
++        actual=$(nix hash file --sri "${out}")
++        [ "${actual}" = "${BUSYBOX_TARBALL_HASH}" ] && { echo "==> OK: ${out}"; return 0; }
++        echo "    hash mismatch, next mirror..." >&2
++      else
++        echo "==> Downloaded ${out} (verify with nix hash file --sri)"
++        return 0
++      fi
++    fi
++  done
++  echo "ERROR: could not download busybox-1.36.1.tar.bz2" >&2
++  exit 1
++}
++
++case "${1:-fork}" in
++  fork) prefetch_fork ;;
++  jo) prefetch_jo ;;
++  vendor-busybox) prefetch_vendor_busybox ;;
++  *)
++    echo "Usage: $0 {fork|jo|vendor-busybox}" >&2
++    exit 1
++    ;;
++esac
+diff --git a/contrib/attestation/package-builder/restore-symlinks.sh b/contrib/attestation/package-builder/restore-symlinks.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..3d00eb1813e169c139505b03ed60c606fd5fbdca
+--- /dev/null
++++ b/contrib/attestation/package-builder/restore-symlinks.sh
+@@ -0,0 +1,47 @@
++#!/bin/sh
++# Recreate the symlinks that the Windows checkout flattened into text files.
++#
++# git on Windows without core.symlinks stores a symlink as a regular file whose
++# entire content is the link target. The fork is copied in from /mnt/c, so every
++# such link arrives broken:
++#
++#   src/libutil/.version                 -> "../../.version"      (14 bytes)
++#   src/libutil/nix-meson-build-support  -> "../../nix-meson-build-support"
++#
++# The first made Meson read the literal path as the project version:
++#   meson.build:1:0: ERROR: Version file must contain exactly one line of text.
++# The second hides the build helpers every subproject's meson.build reads.
++#
++# This runs inside the container rather than on the host because the directory
++# links cannot be copied over sensibly — src/nix/doc points at the whole manual
++# and src/nix-functional-tests at the whole test tree — and Linux has no
++# restriction on creating symlinks.
++set -eu
++
++ROOT="${1:-/nix-src}"
++
++echo "==> Restoring symlinks flattened by the Windows checkout"
++
++# A placeholder is tiny, holds a relative path, and has no newline at all.
++# Anything whose target does not resolve is left alone.
++find "$ROOT" -type f -size -1024c ! -path "*/.git/*" -print | while IFS= read -r f; do
++  [ "$(wc -l < "$f")" -eq 0 ] || continue
++  # Do not use `grep $'\0'` — GNU grep treats a NUL pattern as "match
++  # every file", which skipped the entire restore and left Meson without
++  # nix-meson-build-support. Binary placeholders are already excluded by
++  # the size + `../*` checks; a stray `cat: * : No such file` warning is
++  # harmless.
++
++  target=$(cat "$f")
++  case "$target" in
++    ../*) ;;
++    *) continue ;;
++  esac
++
++  [ -e "$(dirname "$f")/$target" ] || continue
++
++  ln -sfn "$target" "$f"
++  echo "    ${f#"$ROOT"/} -> $target"
++done
++
++echo "==> Symlink restore done"
+diff --git a/contrib/attestation/package-builder/setup-ca-bundle.sh b/contrib/attestation/package-builder/setup-ca-bundle.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..e21bad70b33908166c82b447c86b025f9e9a7fbc
+--- /dev/null
++++ b/contrib/attestation/package-builder/setup-ca-bundle.sh
+@@ -0,0 +1,48 @@
++#!/usr/bin/env bash
++# Build /etc/nix/ca-bundle.crt for TLS (Git, curl, Nix downloads).
++# Not TEE / Harmonia attestation — those are {hashPart}.attestation.json.
++#
++# Inputs:
++#   CORPORATE_CA_B64  optional base64 of one extra CA (build.sh / Zscaler)
++#   CERTS_DIR         extra .crt files (default /build/certs)
++#   CA_BUNDLE         output path (default /etc/nix/ca-bundle.crt)
++#   SKIP_GITHUB_PROBE set to 1 to skip the GitHub HEAD check
++set -euo pipefail
++
++CERTS_DIR="${CERTS_DIR:-/build/certs}"
++CA_BUNDLE="${CA_BUNDLE:-/etc/nix/ca-bundle.crt}"
++BASE="${NIX_CA_BASE:-/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt}"
++
++mkdir -p "$(dirname "$CA_BUNDLE")" /build/logs
++
++if [ ! -f "$BASE" ]; then
++  echo "ERROR: Nix CA bundle not found at $BASE" >&2
++  exit 1
++fi
++
++cat "$BASE" > "$CA_BUNDLE"
++
++if [ -n "${CORPORATE_CA_B64:-}" ]; then
++  echo "${CORPORATE_CA_B64}" | base64 -d >> "$CA_BUNDLE"
++fi
++
++if [ -d "$CERTS_DIR" ]; then
++  for f in "$CERTS_DIR"/*; do
++    [ -f "$f" ] || continue
++    case "$(basename "$f")" in README*|.gitkeep) continue ;; esac
++    cat "$f" >> "$CA_BUNDLE"
++  done
++fi
++
++export SSL_CERT_FILE="$CA_BUNDLE" \
++  NIX_SSL_CERT_FILE="$CA_BUNDLE" \
++  GIT_SSL_CAINFO="$CA_BUNDLE" \
++  NIX_GIT_SSL_CAINFO="$CA_BUNDLE"
++
++git config --global http.sslCAInfo "$CA_BUNDLE"
++
++if [ "${SKIP_GITHUB_PROBE:-0}" != "1" ]; then
++  curl -fsSI --cacert "$CA_BUNDLE" https://github.com >/dev/null
++fi
++
++echo "==> CA bundle $CA_BUNDLE ($(wc -c < "$CA_BUNDLE") bytes)"
+diff --git a/contrib/attestation/package-builder/stage-nokia-runner.sh b/contrib/attestation/package-builder/stage-nokia-runner.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..9cb9612b738d2bde6a9668e889d44c8826d8f969
+--- /dev/null
++++ b/contrib/attestation/package-builder/stage-nokia-runner.sh
+@@ -0,0 +1,51 @@
++#!/usr/bin/env bash
++# Stage files for test_docker.py (build context = nokia-runner/ only).
++set -euo pipefail
++
++cd "$(dirname "$0")"
++
++RUNNER=nokia-runner
++
++if command -v python3 >/dev/null 2>&1; then
++  python3 ./fix-eol.py
++fi
++
++echo "==> Regenerating packages/*.nix from template"
++bash ./gen-package-nix.sh --from-list packages/runtime-attrs.txt packages
++
++echo "==> Staging into ${RUNNER}/"
++mkdir -p "${RUNNER}/packages" "${RUNNER}/vendor"
++
++for f in jo.nix nixpkgs-with-overlay.nix gnu-mirror-overlay.nix export-closure.sh; do
++  cp "$f" "${RUNNER}/$f"
++  echo "    $f"
++done
++
++rm -rf "${RUNNER}/packages"
++mkdir -p "${RUNNER}/packages"
++cp packages/*.nix packages/build-order.txt packages/runtime-attrs.txt "${RUNNER}/packages/"
++echo "    packages/ ($(wc -l < packages/build-order.txt) runtime units + jo)"
++
++if [ ! -d vendor/jo-src ] || [ -z "$(ls -A vendor/jo-src 2>/dev/null)" ]; then
++  echo "ERROR: vendor/jo-src missing — run: bash prefetch.sh jo" >&2
++  exit 1
++fi
++rm -rf "${RUNNER}/vendor/jo-src"
++cp -r vendor/jo-src "${RUNNER}/vendor/jo-src"
++echo "    vendor/jo-src"
++
++for d in busybox-patches unzip-patches gnu-config; do
++  if [ -d "vendor/${d}" ]; then
++    rm -rf "${RUNNER}/vendor/${d}"
++    cp -r "vendor/${d}" "${RUNNER}/vendor/${d}"
++    echo "    vendor/${d}"
++  fi
++done
++
++echo ""
++echo "==> Runtime build order:"
++cat packages/build-order.txt
++echo "jo"
++echo ""
++echo "==> Ready. From dev_test_docker/:"
++echo "    python3 test_docker.py certconf/nix-package-builder/cert_config.json"
+diff --git a/contrib/attestation/package-builder/sync-nix-cache.sh b/contrib/attestation/package-builder/sync-nix-cache.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..43c6f55cb45d12f4a45c45dc31c4093a3412faba
+--- /dev/null
++++ b/contrib/attestation/package-builder/sync-nix-cache.sh
+@@ -0,0 +1,47 @@
++#!/usr/bin/env bash
++# Copy /nix into or out of a BuildKit cache mount.
++#
++# Cache mounts persist when a RUN fails; image layers do not. We never mount
++# over /nix itself: that would hide the nixos/nix install, and a successful
++# compile would leave nix-tee-base without a store (nokia-runner / test_docker.py
++# use the classic builder and FROM nix-tee-base).
++set -euo pipefail
++
++STORE_CACHE="${NIX_TEE_STORE_CACHE:-/mnt/nix-tee-cache/store}"
++VAR_CACHE="${NIX_TEE_VAR_CACHE:-/mnt/nix-tee-cache/var}"
++
++copy_tree() {
++  local src="$1" dest="$2"
++  mkdir -p "${dest}"
++  if command -v rsync >/dev/null 2>&1; then
++    rsync -aH "${src}/" "${dest}/"
++  else
++    tar -C "${src}" -cf - . | tar -C "${dest}" -xf -
++  fi
++}
++
++cmd="${1:-}"
++case "${cmd}" in
++  restore)
++    if [ ! -f "${VAR_CACHE}/nix/db/db.sqlite" ]; then
++      echo "==> Nix BuildKit cache empty — using image /nix"
++      exit 0
++    fi
++    echo "==> Restoring /nix/store from BuildKit cache"
++    copy_tree "${STORE_CACHE}" /nix/store
++    echo "==> Restoring /nix/var from BuildKit cache"
++    copy_tree "${VAR_CACHE}" /nix/var
++    echo "==> Nix cache restore done"
++    ;;
++  save)
++    echo "==> Saving /nix/store to BuildKit cache"
++    copy_tree /nix/store "${STORE_CACHE}"
++    echo "==> Saving /nix/var to BuildKit cache"
++    copy_tree /nix/var "${VAR_CACHE}"
++    echo "==> Nix cache save done"
++    ;;
++  *)
++    echo "usage: $0 restore|save" >&2
++    exit 1
++    ;;
++esac
+diff --git a/contrib/attestation/push-exports-to-harmonia.py b/contrib/attestation/push-exports-to-harmonia.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..c66f4d156b465b959ee4bf84d649e3bdaaf7c144
+--- /dev/null
++++ b/contrib/attestation/push-exports-to-harmonia.py
+@@ -0,0 +1,13 @@
++#!/usr/bin/env python3
++"""Deprecated: do not rsync NARs as a file:// cache.
++
++Import NARs into the local store (binding certs), then nix-copy-closure:
++
++  python3 ingest-nars-to-store.py --outputs … --nix-store /path/to/fork/nix-store
++  nix-copy-closure --to ssh://harmoniatest@HOST /nix/store/…-jo-1.7
++"""
++
++import sys
++
++sys.stderr.write(__doc__)
++raise SystemExit(1)
+diff --git a/contrib/attestation/push-exports-to-harmonia.sh b/contrib/attestation/push-exports-to-harmonia.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..c876da19412e165faaee6a2ad16db4d7ef144dd2
+--- /dev/null
++++ b/contrib/attestation/push-exports-to-harmonia.sh
+@@ -0,0 +1,5 @@
++#!/usr/bin/env bash
++# Wrapper: see push-exports-to-harmonia.py
++set -euo pipefail
++here=$(cd "$(dirname "$0")" && pwd)
++exec python3 "$here/push-exports-to-harmonia.py" "$@"
+diff --git a/contrib/attestation/sign-attestation-certs.py b/contrib/attestation/sign-attestation-certs.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..cf47543ca6416ffebc7a3fb2d5bba17dcc0d7f35
+--- /dev/null
++++ b/contrib/attestation/sign-attestation-certs.py
+@@ -0,0 +1,104 @@
++#!/usr/bin/env python3
++"""Sign CACTEE/Nix attestation JSON with a Nix binary-cache secret key.
++
++The JSON on disk is not a trust root. Nix verifies
++  <hashPart>.attestation.sig
++using the same Ed25519 keys as .narinfo (trusted-public-keys).
++
++Fingerprint (UTF-8):
++  attestation:1;<storePath>;<narHash-SRI>;<sha256-SRI of cert bytes>
++
++Usage:
++  nix-store --generate-binary-cache-key harmonia-1 ./cache.secret ./cache.pub
++  python3 sign-attestation-certs.py --secret-key ./cache.secret \\
++      ~/dev_test_docker/test_temp/tmp/outputs
++
++Writes certificates/harmonia/<hashPart>.attestation.json and .sig
++Serve those two files next to Harmonia (proxy). Put cache.pub in
++trusted-public-keys on clients.
++"""
++
++from __future__ import annotations
++
++import argparse
++import base64
++import hashlib
++import json
++import sys
++from pathlib import Path
++
++from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
++
++
++def sri_sha256(data: bytes) -> str:
++    digest = hashlib.sha256(data).digest()
++    return "sha256-" + base64.b64encode(digest).decode("ascii")
++
++
++def fingerprint(store_path: str, nar_hash: str, cert_bytes: bytes) -> str:
++    return f"attestation:1;{store_path};{nar_hash};{sri_sha256(cert_bytes)}"
++
++
++def load_secret_key(path: Path) -> tuple[str, Ed25519PrivateKey]:
++    line = path.read_text(encoding="utf-8").strip().splitlines()[0]
++    name, b64 = line.split(":", 1)
++    raw = base64.b64decode(b64)
++    if len(raw) < 32:
++        raise SystemExit(f"ERROR: secret key too short: {path}")
++    # libsodium secret key is 64 bytes (seed || pubkey); Ed25519 seed is 32.
++    return name, Ed25519PrivateKey.from_private_bytes(raw[:32])
++
++
++def sign_line(key_name: str, key: Ed25519PrivateKey, data: bytes) -> str:
++    sig = key.sign(data)
++    return key_name + ":" + base64.b64encode(sig).decode("ascii")
++
++
++def hash_part(store_path: str) -> str:
++    base = Path(store_path).name
++    return base.split("-", 1)[0]
++
++
++def main() -> int:
++    p = argparse.ArgumentParser(description=__doc__)
++    p.add_argument("exports", type=Path, help="export root with index.json + packages/ + certificates/")
++    p.add_argument("--secret-key", type=Path, required=True, help="nix binary-cache secret key")
++    args = p.parse_args()
++    exports = args.exports.resolve()
++    index = json.loads((exports / "index.json").read_text(encoding="utf-8"))
++    names = index.get("packages") or []
++    key_name, key = load_secret_key(args.secret_key)
++    out = exports / "certificates" / "harmonia"
++    out.mkdir(parents=True, exist_ok=True)
++
++    written = 0
++    for name in names:
++        man_path = exports / "packages" / name / "manifest.json"
++        cert_src = exports / "certificates" / f"{name}_asset_certificate.json"
++        if not man_path.is_file() or not cert_src.is_file():
++            print(f"SKIP {name}", file=sys.stderr)
++            continue
++        man = json.loads(man_path.read_text(encoding="utf-8"))
++        store_path = man.get("storePath") or ""
++        nar_hash = man.get("narHash") or ""
++        if not store_path or not nar_hash:
++            print(f"SKIP incomplete manifest {name}", file=sys.stderr)
++            continue
++        cert_bytes = cert_src.read_bytes()
++        fp = fingerprint(store_path, nar_hash, cert_bytes)
++        hp = hash_part(store_path)
++        json_path = out / f"{hp}.attestation.json"
++        sig_path = out / f"{hp}.attestation.sig"
++        json_path.write_bytes(cert_bytes)
++        sig_path.write_text(sign_line(key_name, key, fp.encode("utf-8")) + "\n", encoding="utf-8")
++        written += 1
++        print(f"  {hp}.attestation.json + .sig")
++
++    print(f"wrote {written} signed cert pair(s) under {out}")
++    print("Serve *.attestation.json and *.attestation.sig on the cache URL.")
++    print(f"Client trusted-public-keys must include the matching public key ({key_name}).")
++    return 0 if written else 1
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/contrib/attestation/slides.html b/contrib/attestation/slides.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd5d517bd23a403d623d521d15a2a0af5e2de5e9
+--- /dev/null
++++ b/contrib/attestation/slides.html
+@@ -0,0 +1,190 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++<meta charset="utf-8"/>
++<title>Nix TEE attestation — demo</title>
++<style>
++  html, body { margin: 0; height: 100%; font-family: Segoe UI, system-ui, sans-serif; background: #0f1419; color: #e7ecf3; }
++  .slide { display: none; box-sizing: border-box; min-height: 100%; padding: 4vh 6vw 11vh; }
++  .slide.on { display: block; }
++  h1 { font-size: 2rem; margin: 0 0 0.35em; color: #fff; }
++  p, li { font-size: 1.08rem; line-height: 1.4; max-width: 54em; }
++  ul { margin: 0.35em 0 0.5em; }
++  code, pre, kbd { font-family: Consolas, ui-monospace, monospace; }
++  pre { background: #1a2330; padding: 0.75rem 0.95rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; line-height: 1.35; max-width: 60em; }
++  .muted { color: #9aa8b8; font-size: 0.9rem; }
++  .say { color: #d5e4f7; font-size: 0.98rem; border-left: 3px solid #4a8ad4; padding: 0.45rem 0.75rem; margin: 0.45em 0 0.2em; max-width: 54em; background: #152033; border-radius: 0 8px 8px 0; }
++  .bol { color: #e8d9b0; font-size: 0.95rem; border-left: 3px solid #c9a227; padding: 0.45rem 0.75rem; margin: 0.2em 0 0.55em; max-width: 54em; background: #1c1a12; border-radius: 0 8px 8px 0; }
++  .tag { display: inline-block; background: #243044; color: #8cb4ff; padding: 0.12em 0.55em; border-radius: 999px; font-size: 0.78rem; margin-right: 0.35em; }
++  .ok { color: #7dcea0; } .bad { color: #f1948a; }
++  .footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 0.55rem 1.4rem; background: #0f1419ee; color: #6b7785; font-size: 0.82rem; display: flex; justify-content: space-between; }
++  kbd { background: #243044; padding: 0.08em 0.35em; border-radius: 4px; }
++  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.45rem; margin: 0.7rem 0; }
++  .box { background: #1a2330; border: 1px solid #334155; border-radius: 10px; padding: 0.65rem 0.85rem; min-width: 8.5rem; flex: 1; }
++  .box strong { display: block; color: #8cb4ff; font-size: 0.78rem; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 0.25rem; }
++  .box.ok { border-color: #2d6a4f; background: #14241c; }
++  .box.key { border-color: #c9a227; }
++  .arr { align-self: center; color: #8cb4ff; font-size: 1.35rem; font-weight: 600; }
++  .steps { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.55rem 0; }
++  .step { background: #1a2330; border-radius: 8px; padding: 0.5rem 0.7rem; flex: 1; min-width: 7rem; font-size: 0.88rem; }
++  .step b { display: block; color: #8cb4ff; font-size: 0.75rem; }
++  svg.ill { display: block; width: 100%; max-width: 720px; height: auto; margin: 0.45rem 0 0.6rem; }
++</style>
++</head>
++<body>
++
++<div class="slide on">
++  <p><span class="tag">Live demo</span><span class="tag">what we built</span></p>
++  <h1>Attested <code>jo</code> over Harmonia</h1>
++  <svg class="ill" viewBox="0 0 720 110" role="img" aria-label="Builder to Harmonia to client">
++    <rect x="8" y="22" width="170" height="66" rx="8" fill="#1a2330" stroke="#4a8ad4"/>
++    <text x="93" y="50" text-anchor="middle" fill="#8cb4ff" font-size="13">Builder 24.04</text>
++    <text x="93" y="70" text-anchor="middle" fill="#e7ecf3" font-size="11">NAR + json + sig</text>
++    <text x="195" y="60" fill="#8cb4ff" font-size="20">→</text>
++    <rect x="220" y="22" width="170" height="66" rx="8" fill="#1a2330" stroke="#c9a227"/>
++    <text x="305" y="50" text-anchor="middle" fill="#c9a227" font-size="13">Harmonia :5000</text>
++    <text x="305" y="70" text-anchor="middle" fill="#e7ecf3" font-size="11">HTTP only</text>
++    <text x="407" y="60" fill="#8cb4ff" font-size="20">→</text>
++    <rect x="432" y="22" width="270" height="66" rx="8" fill="#14241c" stroke="#2d6a4f"/>
++    <text x="567" y="50" text-anchor="middle" fill="#7dcea0" font-size="13">Fork client</text>
++    <text x="567" y="70" text-anchor="middle" fill="#e7ecf3" font-size="11">verify json+sig, then NAR</text>
++  </svg>
++  <p class="say"><b>Say:</b> We built overlay jo, signed sidecars, serve them on Harmonia, client fork checks certs then copies. Live is curl + nix copy + jo.</p>
++  <p class="bol"><b>Bolo:</b> jo build, sign, Harmonia, client verify. Live: curl, nix copy, jo -a 1 2 3.</p>
++</div>
++
++<div class="slide">
++  <h1>Lab: three machines, two keys</h1>
++  <div class="flow">
++    <div class="box"><strong>Builder</strong>Ubuntu 24.04 <code>aetisam</code><br>nix-tee-base + nokia-runner</div>
++    <div class="box key"><strong>Harmonia</strong>22.04 <code>harmoniatest</code><br><code>http://172.23.34.154:5000</code></div>
++    <div class="box ok"><strong>Client</strong><code>nixclient</code><br>fork <code>~/nix-prefix</code></div>
++  </div>
++  <pre>cache.local-1:ha9X4p7WPnKWAV3BdWw7ddOqWJY6UNfKieCAO61ogs4=   # narinfo
++harmonia-1:0fFNwWgTwJcGXkOvmz7N8DqVfkl9dGUGss8+Q3ilKpk=     # attestation.sig</pre>
++  <p class="say"><b>Say:</b> Two keys. Narinfo is Harmonia. Certificate is the builder. Client must have both.</p>
++  <p class="bol"><b>Bolo:</b> Do keys — narinfo Harmonia, cert builder. Client par dono.</p>
++</div>
++
++<div class="slide">
++  <h1>What we actually built</h1>
++  <div class="flow">
++    <div class="box ok"><strong>1. nix-tee-base</strong><code>./build.sh nix-tee-base nix-tee-base</code><br>compile Nix fork</div>
++    <span class="arr">→</span>
++    <div class="box ok"><strong>2. nokia-runner</strong><code>stage-nokia-runner.sh</code><br><code>test_docker.py</code> overlays + jo</div>
++    <span class="arr">→</span>
++    <div class="box"><strong>3. sign + serve</strong>export-closure, sign certs,<br>push to Harmonia</div>
++  </div>
++  <p class="muted">Working dir: <code>~/dev_test_docker/certconf/nix-package-builder</code>. Package-builder docker target failed (hash mismatch) — not this demo.</p>
++  <p class="say"><b>Say:</b> Base image compiled the fork. nokia-runner built the overlay packages. Then we signed and pushed. Not rebuilding now.</p>
++  <p class="bol"><b>Bolo:</b> Base compile, nokia-runner se jo, phir sign. Ab live cache se copy.</p>
++</div>
++
++<div class="slide">
++  <h1>Store path we serve</h1>
++  <pre>/nix/store/i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7
++http://172.23.34.154:5000/i0d0rjpig00qhhmf1qnvndavn82cfv22.narinfo
++http://172.23.34.154:5000/i0d0rjpig00qhhmf1qnvndavn82cfv22.attestation.json
++http://172.23.34.154:5000/i0d0rjpig00qhhmf1qnvndavn82cfv22.attestation.sig</pre>
++  <p class="muted">Do not use nix-shell / flake jo — different hash, 404.</p>
++  <p class="say"><b>Say:</b> Same 32-char hashPart for narinfo, json, and sig. This is the overlay jo, not nixpkgs jo.</p>
++  <p class="bol"><b>Bolo:</b> Yeh wahi path hai cache par. Flake mat chalana.</p>
++</div>
++
++<div class="slide">
++  <h1>Live 1 — cache + sidecars</h1>
++  <pre>curl -sS http://172.23.34.154:5000/nix-cache-info
++curl -sS http://172.23.34.154:5000/i0d0rjpig00qhhmf1qnvndavn82cfv22.narinfo | head
++curl -sS -o /dev/null -w 'json %{http_code}  sig ' \
++  http://172.23.34.154:5000/i0d0rjpig00qhhmf1qnvndavn82cfv22.attestation.json
++curl -sS -o /dev/null -w '%{http_code}\n' \
++  http://172.23.34.154:5000/i0d0rjpig00qhhmf1qnvndavn82cfv22.attestation.sig</pre>
++  <p class="ok">narinfo <code>Sig: cache.local-1</code> · json and sig HTTP 200</p>
++  <p class="say"><b>Say:</b> Listing is Harmonia. json+sig are our sidecars. Next the fork verifies before the NAR.</p>
++  <p class="bol"><b>Bolo:</b> Cache up, sidecar 200. Ab copy.</p>
++</div>
++
++<div class="slide">
++  <h1>Live 2 — fork <code>nix copy</code></h1>
++  <p>Daemon <strong>and</strong> socket off. Fork binary, both keys.</p>
++  <pre>sudo systemctl stop nix-daemon.socket nix-daemon.service
++
++sudo env -u NIX_REMOTE \
++  LD_LIBRARY_PATH=/home/nixclient/nix-prefix/lib/x86_64-linux-gnu \
++  ATTESTATION_STUB_MODE=1 \
++  /home/nixclient/nix-prefix/bin/nix copy \
++    --option trusted-public-keys 'cache.local-1:ha9X4p7WPnKWAV3BdWw7ddOqWJY6UNfKieCAO61ogs4= harmonia-1:0fFNwWgTwJcGXkOvmz7N8DqVfkl9dGUGss8+Q3ilKpk=' \
++    --from http://172.23.34.154:5000 \
++    /nix/store/i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7</pre>
++  <p class="say"><b>Say:</b> Stock daemon does not do this check. Stub mode: we are not claiming live TDX here.</p>
++  <p class="bol"><b>Bolo:</b> Daemon band, fork nix, dono keys. Stub = live TDX nahi.</p>
++</div>
++
++<div class="slide">
++  <h1>What to show in the log</h1>
++  <div class="steps">
++    <div class="step"><b>1</b>attestation: fetched …json / …sig</div>
++    <div class="step"><b>2</b>JSON certificate verified</div>
++    <div class="step"><b>3</b>copying path … (NAR last)</div>
++  </div>
++  <p class="bad">If copying path comes first — wrong nix or daemon still up. Stop.</p>
++  <p class="say"><b>Say:</b> Fetched, then verified, then copy. Dependencies first, then jo.</p>
++  <p class="bol"><b>Bolo:</b> Pehle fetched, phir copying. Ulta ho to ruk jao.</p>
++</div>
++
++<div class="slide">
++  <h1>Live 3 — run it</h1>
++  <pre>/nix/store/i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7/bin/jo -a 1 2 3
++# [1,2,3]</pre>
++  <p class="say"><b>Say:</b> Same store path. Accepted only after sidecar verify.</p>
++  <p class="bol"><b>Bolo:</b> Binary chal gayi. Cert ke baad store mein aayi.</p>
++</div>
++
++<div class="slide">
++  <h1>Optional: hide <code>.sig</code> → copy fails</h1>
++  <div class="flow">
++    <div class="box"><strong>Harmonia</strong>rename attestation.sig</div>
++    <span class="arr">→</span>
++    <div class="box"><strong>Client</strong>nix copy again</div>
++    <span class="arr">→</span>
++    <div class="box"><strong>Must fail</strong>no NAR in store</div>
++  </div>
++  <p class="muted">Restore the file after. Skip if short on time.</p>
++  <p class="say"><b>Say:</b> Without the builder signature the client refuses the NAR.</p>
++  <p class="bol"><b>Bolo:</b> Sig hatao to copy fail. Phir file wapas.</p>
++</div>
++
++<div class="slide">
++  <h1>Done</h1>
++  <p>Untrusted HTTP cache. Trusted builder key. Check in libstore <strong>before</strong> the NAR.</p>
++  <p class="muted">POC: stub quotes, fork client (not stock daemon), Harmonia only.</p>
++  <p class="say"><b>Say:</b> We did not make Harmonia honest. The client refuses a NAR without a builder signature.</p>
++  <p class="bol"><b>Bolo:</b> Cache ko honest nahi banaya. Bina builder signature ke NAR nahi.</p>
++</div>
++
++<p class="footer">
++  <span><kbd>←</kbd> <kbd>→</kbd> · <kbd>N</kbd> hide script</span>
++  <span id="n"></span>
++</p>
++<script>
++const s = [...document.querySelectorAll('.slide')];
++let i = 0, notes = true;
++function show(k) {
++  i = Math.max(0, Math.min(s.length - 1, k));
++  s.forEach((el, j) => el.classList.toggle('on', j === i));
++  document.getElementById('n').textContent = (i + 1) + ' / ' + s.length;
++}
++function applyNotes() {
++  document.querySelectorAll('.say,.bol').forEach(el => { el.style.display = notes ? '' : 'none'; });
++}
++show(0);
++document.addEventListener('keydown', e => {
++  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(i + 1); }
++  if (e.key === 'ArrowLeft') { e.preventDefault(); show(i - 1); }
++  if (e.key === 'Home') show(0);
++  if (e.key === 'End') show(s.length - 1);
++  if (e.key === 'n' || e.key === 'N') { notes = !notes; applyNotes(); }
++});
++</script>
++</body>
++</html>

@@ -1,0 +1,13 @@
+# © 2026 Nokia
+# Licensed under the MIT License
+# SPDX-License-Identifier: MIT
+
+Docker/*/ca/
+**/ca/
+*.nar
+Docker/.env
+__pycache__/
+*.bak
+cactee-pkgs/*/generated/
+Docker/*.log
+Docker/.publisher-build/

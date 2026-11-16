@@ -1,0 +1,2966 @@
+# © 2026 Nokia
+# Licensed under the MIT License
+# SPDX-License-Identifier: MIT
+
+Subject: [PATCH 1/3] libstore, nix-store: verify CACTEE attestation certificates
+
+Base:   NixOS/nix 0765ffa540e2adfda7b69efafdbac821ebc48034
+        (master, 2026-09-04, "Merge pull request #16340 from JamieMagee/fuzz/seed-replay")
+Source: nix-tee/nix-fork/nix-src (branch feature/tee-attestation)
+
+Adds client-side CACTEE certificate verification to libstore: substituted
+and copied store paths are rejected unless their {hashPart}.attestation.json
+CACTEE certificate verifies against attestation-cactee-manifest. Adds serve protocol
+2.9 (PutAttestation), nix-store --import-nar, the attestation-* settings,
+and the certificate verifier that libstore compiles in. The default
+substituters list becomes empty.
+
+Apply with: git apply <patch>   or   patch -p1 < <patch>
+
+Apply from the root of a NixOS/nix checkout at the base commit.
+See README.md next to this file for the file list and caveats.
+---
+ doc/manual/source/SUMMARY.md.in                                |   1 +
+ doc/manual/source/command-ref/nix-copy-closure.md              |   5 +
+ doc/manual/source/command-ref/nix-store.md                     |   1 +
+ doc/manual/source/command-ref/nix-store/import-nar.md          |  44 ++
+ src/certification-verification/Include/certificate-verifier.hh |  38 ++
+ src/certification-verification/certificate-verifier.cc         | 831 +++++++++++++++++++++++++++++
+ src/certification-verification/check-nix-settings.sh           |   8 +
+ src/certification-verification/copy-to-wsl.sh                  |  25 +
+ src/certification-verification/main.cc                         |  32 ++
+ src/certification-verification/meson.build                     |  16 +
+ src/certification-verification/run-smoke.sh                    |   4 +
+ src/certification-verification/sample-certificate.json         | 130 +++++
+ src/certification-verification/simulate-azure.py               | 159 ++++++
+ src/certification-verification/smoke-test.cc                   |  61 +++
+ src/certification-verification/smoke.sh                        |  10 +
+ src/certification-verification/which-nix.sh                    |  15 +
+ src/libstore/attestation.cc                                    | 557 +++++++++++++++++++
+ src/libstore/binary-cache-store.cc                             |   9 +
+ src/libstore/build/derivation-building-goal.cc                 |   1 +
+ src/libstore/build/substitution-goal.cc                        |   2 +
+ src/libstore/cactee-link.cc                                    |   3 +
+ src/libstore/globals.cc                                        |   2 +
+ src/libstore/include/nix/store/attestation-settings.hh         |  72 +++
+ src/libstore/include/nix/store/attestation.hh                  |  64 +++
+ src/libstore/include/nix/store/binary-cache-store.hh           |   3 +
+ src/libstore/include/nix/store/build/worker.hh                 |   3 +
+ src/libstore/include/nix/store/globals.hh                      |  17 +-
+ src/libstore/include/nix/store/legacy-ssh-store.hh             |   3 +
+ src/libstore/include/nix/store/local-store.hh                  |  13 +-
+ src/libstore/include/nix/store/meson.build                     |   2 +
+ src/libstore/include/nix/store/serve-protocol.hh               |   6 +-
+ src/libstore/include/nix/store/store-api.hh                    |   9 +
+ src/libstore/include/nix/store/worker-settings.hh              |   6 +-
+ src/libstore/legacy-ssh-store.cc                               |   8 +
+ src/libstore/local-store.cc                                    |  13 +-
+ src/libstore/meson.build                                       |  27 +
+ src/libstore/package.nix                                       |   4 +
+ src/libstore/store-api.cc                                      |  42 +-
+ src/nix/nix-store/nix-store.cc                                 | 103 +++-
+ 39 files changed, 2330 insertions(+), 19 deletions(-)
+ create mode 100644 doc/manual/source/command-ref/nix-store/import-nar.md
+ create mode 100644 src/certification-verification/Include/certificate-verifier.hh
+ create mode 100644 src/certification-verification/certificate-verifier.cc
+ create mode 100755 src/certification-verification/check-nix-settings.sh
+ create mode 100755 src/certification-verification/copy-to-wsl.sh
+ create mode 100644 src/certification-verification/main.cc
+ create mode 100644 src/certification-verification/meson.build
+ create mode 100755 src/certification-verification/run-smoke.sh
+ create mode 100644 src/certification-verification/sample-certificate.json
+ create mode 100755 src/certification-verification/simulate-azure.py
+ create mode 100644 src/certification-verification/smoke-test.cc
+ create mode 100755 src/certification-verification/smoke.sh
+ create mode 100755 src/certification-verification/which-nix.sh
+ create mode 100644 src/libstore/attestation.cc
+ create mode 100644 src/libstore/cactee-link.cc
+ create mode 100644 src/libstore/include/nix/store/attestation-settings.hh
+ create mode 100644 src/libstore/include/nix/store/attestation.hh
+
+diff --git a/doc/manual/source/SUMMARY.md.in b/doc/manual/source/SUMMARY.md.in
+index 612a13c7702452c642da724c74b2f7a6383c5d76..54ce045fab9930f2e0ca4d8bb664d3eeae85c42b 100644
+--- a/doc/manual/source/SUMMARY.md.in
++++ b/doc/manual/source/SUMMARY.md.in
+@@ -79,6 +79,7 @@
+       - [nix-store --gc](command-ref/nix-store/gc.md)
+       - [nix-store --generate-binary-cache-key](command-ref/nix-store/generate-binary-cache-key.md)
+       - [nix-store --import](command-ref/nix-store/import.md)
++      - [nix-store --import-nar](command-ref/nix-store/import-nar.md)
+       - [nix-store --load-db](command-ref/nix-store/load-db.md)
+       - [nix-store --optimise](command-ref/nix-store/optimise.md)
+       - [nix-store --print-env](command-ref/nix-store/print-env.md)
+diff --git a/doc/manual/source/command-ref/nix-copy-closure.md b/doc/manual/source/command-ref/nix-copy-closure.md
+index b34d57a5015096a4efc54f51da63be4cdb447820..fd1ccaac8af1dd70d363da2599a297e7e32c6c34 100644
+--- a/doc/manual/source/command-ref/nix-copy-closure.md
++++ b/doc/manual/source/command-ref/nix-copy-closure.md
+@@ -17,6 +17,11 @@
+ Given _paths_ from one machine, `nix-copy-closure` computes the [closure](@docroot@/glossary.md#gloss-closure) of those paths (i.e. all their dependencies in the Nix store), and copies [store objects](@docroot@/glossary.md#gloss-store-object) in that closure to another machine via SSH.
+ It doesn’t copy store objects that are already present on the other machine.
+ 
++This Nix fork also copies `{hashPart}.attestation.json` and `.sig` for each
++path (serve protocol 2.9), **before** the NAR. Bind those files first with
++[`nix-store --import-nar`](./nix-store/import-nar.md). The remote
++`nix-store --serve --write` must be this fork.
++
+ > **Note**
+ >
+ > While the Nix store to use on the local machine can be specified on the command line with the [`--store`](@docroot@/command-ref/conf-file.md#conf-store) option, the Nix store to be accessed on the remote machine can only be [configured statically](@docroot@/command-ref/conf-file.md#configuration-file) on that remote machine.
+diff --git a/doc/manual/source/command-ref/nix-store.md b/doc/manual/source/command-ref/nix-store.md
+index 8bdbf35292ba00e63bdbc49f5e23510b13c9c19f..35c1455dc6b5887f5972e37a1584616c6c5b2b7b 100644
+--- a/doc/manual/source/command-ref/nix-store.md
++++ b/doc/manual/source/command-ref/nix-store.md
+@@ -29,6 +29,7 @@ You generally do not need to run this command manually.
+ - [`--restore`](./nix-store/restore.md)
+ - [`--export`](./nix-store/export.md)
+ - [`--import`](./nix-store/import.md)
++- [`--import-nar`](./nix-store/import-nar.md)
+ - [`--optimise`](./nix-store/optimise.md)
+ - [`--read-log`](./nix-store/read-log.md)
+ - [`--dump-db`](./nix-store/dump-db.md)
+diff --git a/doc/manual/source/command-ref/nix-store/import-nar.md b/doc/manual/source/command-ref/nix-store/import-nar.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..be4238e11dbb78abc5710d879368599c7cc07720
+--- /dev/null
++++ b/doc/manual/source/command-ref/nix-store/import-nar.md
+@@ -0,0 +1,44 @@
++# Name
++
++`nix-store --import-nar` - import one NAR at a known store path and bind its attestation sidecar
++
++# Synopsis
++
++`nix-store` `--import-nar` *store-path* *nar-file*
++  [`--nar-hash` *sri*]
++  [`--references` *store-path*]…
++  [`--deriver` *drv-path*]
++  [`--attestation-json` *file*]
++  [`--attestation-sig` *file*]
++
++# Description
++
++Unlike [`nix-store --restore`](./restore.md), this registers the path in the Nix database (so [`nix-copy-closure`](@docroot@/command-ref/nix-copy-closure.md) can copy its closure). Unlike [`nix-store --import`](./import.md), the input is a raw NAR from `nix-store --dump`, not an export stream.
++
++The store path is the input-addressed path from the builder (it is **not** recomputed from the NAR hash).
++
++If `--attestation-json` / `--attestation-sig` are given, Nix verifies the cache signature (`trusted-public-keys`) and writes `{hashPart}.attestation.json` and `.sig` under `attestation-harmonia-dir` and `attestation-store`. Otherwise it looks for those files already in those directories (`bindAttestationSidecarFromDisk`).
++
++After this, `nix-copy-closure --to ssh://host store-path` sends each path's sidecar **before** the NAR (serve protocol 2.9). The remote `nix-store --serve --write` must be this Nix fork; stock Nix 2.8 skips the sidecar.
++
++`--references` should list runtime / direct-input store paths that are already valid (import leaves first).
++
++{{#include ./opt-common.md}}
++
++{{#include ../opt-common.md}}
++
++{{#include ../env-common.md}}
++
++# Examples
++
++```console
++$ nix-store --import-nar \
++    /nix/store/i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7 \
++    ./nars/sha256-….nar \
++    --nar-hash sha256-8F69FTswF4p69HBwztO27PUg8zMAm+r3VK0simezU5Q= \
++    --attestation-json ./certificates/harmonia/i0d0rjpig00qhhmf1qnvndavn82cfv22.attestation.json \
++    --attestation-sig  ./certificates/harmonia/i0d0rjpig00qhhmf1qnvndavn82cfv22.attestation.sig
++
++$ nix-copy-closure --to harmoniatest@host \
++    /nix/store/i0d0rjpig00qhhmf1qnvndavn82cfv22-jo-1.7
++```
+diff --git a/src/certification-verification/Include/certificate-verifier.hh b/src/certification-verification/Include/certificate-verifier.hh
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7dbd7edb59065d91a561b463f7a2290653b011b
+--- /dev/null
++++ b/src/certification-verification/Include/certificate-verifier.hh
+@@ -0,0 +1,38 @@
++#pragma once 
++#include <filesystem>
++#include <string>
++#include <string_view>
++#include <vector>
++
++#include <nlohmann/json.hpp>
++#include <expected>
++
++namespace certificate_verifier {
++    struct StepResult {
++        std::string name;
++        bool ok=false;
++        std::string detail;
++    };
++    struct VerificationResult {
++        std::vector<StepResult> steps;
++        bool ok=false;
++    };
++
++    class CertificateVerifier{
++    public:
++        /* outputFolder is the realised store path. narHashHex is the
++           SHA-256 of the NAR bytes. Empty means those bytes are not
++           available yet, so step 05 does not compare the .nar hash. */
++        CertificateVerifier(
++            std::filesystem::path outputFolder,
++            nlohmann::json expectedManifest,
++            std::string narHashHex = {});
++
++        std::expected<VerificationResult, std::string> verifyCertificate(const nlohmann::json& certificate, std::string_view quoteProvider);        
++    private:
++        std::filesystem::path _output_folder;
++        std::string _nar_hash_hex;
++        nlohmann::json _expectedServiceInfo;
++        std::string _expectedMRENCLAVE;
++    };
++}   
+\ No newline at end of file
+diff --git a/src/certification-verification/certificate-verifier.cc b/src/certification-verification/certificate-verifier.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5ea346ab8d6f7df4ef562bad3cdc807adbaaf98
+--- /dev/null
++++ b/src/certification-verification/certificate-verifier.cc
+@@ -0,0 +1,831 @@
++#include "Include/certificate-verifier.hh"
++#include <stdexcept>
++#include <openssl/evp.h>
++#include <openssl/bn.h>
++#include <openssl/core_names.h>
++#include <openssl/param_build.h>
++#include <nlohmann/json.hpp>
++#include <openssl/pem.h>
++#include <openssl/rsa.h>
++#include <openssl/bio.h>
++#include <algorithm>
++#include <chrono>
++#include <cstdlib>
++#include <curl/curl.h>
++#include <fstream>
++#include <iterator>
++#include <mutex>
++
++namespace certificate_verifier{
++    std::string sha256hex(std::string_view data)
++    {
++        unsigned char digest[EVP_MAX_MD_SIZE];
++        unsigned int digest_len = 0;
++
++        if(!EVP_Digest(data.data(), data.size(), digest, &digest_len, EVP_sha256(), nullptr)){
++            throw std::runtime_error("Failed to compute Digest");
++        }
++        std::string output(digest_len * 2, '\0');
++        std::string hex = "0123456789abcdef";
++        for (unsigned int i = 0; i < digest_len; ++i)
++        {
++            output[i * 2] = hex[digest[i] >> 4];
++            output[i * 2 + 1] = hex[digest[i] & 0x0f];
++
++        }
++        return output;
++    }
++    std::string sliceHex(const std::string & quote, std::size_t offset)
++    {
++        const char hex[] = "0123456789abcdef";
++        std::string out(64, '\0');
++        for (std::size_t i = 0; i < 32; ++i) {
++            unsigned char byte = static_cast<unsigned char>(quote[offset + i]);
++            out[i * 2] = hex[byte >> 4];
++            out[i * 2 + 1] = hex[byte & 0x0f];
++        }
++        return out;
++    }
++    // Canonical JSON serialization
++    std::string quoteJsonString(const std::string & text)
++    {
++        std::string out = "\"";
++        for (unsigned char c : text) {
++            if (c == '"')
++                out += "\\\"";
++            else if (c == '\\')
++                out += "\\\\";
++            else if (c == '\n')
++                out += "\\n";
++            else if (c == '\r')
++                out += "\\r";
++            else if (c == '\t')
++                out += "\\t";
++            else
++                out += static_cast<char>(c);
++        }
++        out += '"';
++        return out;
++    }
++    std::string canonicalJson(const nlohmann::json & value)
++    {
++        if (value.is_null())
++            return "null";
++        if (value.is_boolean())
++            return value.get<bool>() ? "true" : "false";
++        if (value.is_number())
++            return value.dump();
++        if (value.is_string())
++            return quoteJsonString(value.get<std::string>());
++        if (value.is_array()) {
++            std::string out = "[";
++            for (std::size_t i = 0; i < value.size(); ++i) {
++                if (i != 0)
++                    out += ", ";
++                out += canonicalJson(value[i]);
++            }
++            out += "]";
++            return out;
++        }
++        std::vector<std::string> keys;
++        for (auto it = value.begin(); it != value.end(); ++it)
++            keys.push_back(it.key());
++        std::sort(keys.begin(), keys.end());
++        std::string out = "{";
++        for (std::size_t i = 0; i < keys.size(); ++i) {
++            if (i != 0)
++                out += ", ";
++            out += quoteJsonString(keys[i]);
++            out += ": ";
++            out += canonicalJson(value[keys[i]]);
++        }
++        out += "}";
++        return out;
++    }
++    bool verifyPss(std::string_view signature, std::string_view message, std::string_view publicKeyPem)
++    {
++        BIO *bio = BIO_new_mem_buf(publicKeyPem.data(), static_cast<int>(publicKeyPem.size()));
++        if (!bio)
++            throw std::runtime_error("OpenSSL BIO failed");
++
++        EVP_PKEY *key = PEM_read_bio_PUBKEY(bio, nullptr, nullptr, nullptr);
++        BIO_free(bio);
++        if (!key)
++            return false;
++
++        EVP_MD_CTX *ctx = EVP_MD_CTX_new();
++        EVP_PKEY_CTX *keyCtx = nullptr;
++        if (!ctx) {
++            EVP_PKEY_free(key);
++            throw std::runtime_error("OpenSSL context failed");
++        }
++
++        const bool ok =
++            EVP_DigestVerifyInit(ctx, &keyCtx, EVP_sha256(), nullptr, key) == 1
++            && EVP_PKEY_CTX_set_rsa_padding(keyCtx, RSA_PKCS1_PSS_PADDING) == 1
++            && EVP_PKEY_CTX_set_rsa_mgf1_md(keyCtx, EVP_sha256()) == 1
++            && EVP_PKEY_CTX_set_rsa_pss_saltlen(keyCtx, RSA_PSS_SALTLEN_MAX) == 1
++            && EVP_DigestVerifyUpdate(ctx, message.data(), message.size()) == 1
++            && EVP_DigestVerifyFinal(
++                ctx,
++                reinterpret_cast<const unsigned char *>(signature.data()),
++                signature.size()) == 1;
++
++        EVP_MD_CTX_free(ctx);
++        EVP_PKEY_free(key);
++        return ok;
++    }
++    
++    std::string base64Decode(std::string_view in)
++    {
++        auto value = [](char c) -> int {
++            if (c >= 'A' && c <= 'Z') return c - 'A';
++            if (c >= 'a' && c <= 'z') return c - 'a' + 26;
++            if (c >= '0' && c <= '9') return c - '0' + 52;
++            if (c == '+') return 62;
++            if (c == '/') return 63;
++            return -1;
++        };
++
++        std::string filtered;
++        for (char c : in)
++            if (c == '=' || value(c) >= 0)
++                filtered.push_back(c);
++        if (filtered.size() % 4 != 0)
++            return {};
++
++        std::string out;
++        for (std::size_t i = 0; i < filtered.size(); i += 4) {
++            int n0 = filtered[i] == '=' ? 0 : value(filtered[i]);
++            int n1 = filtered[i + 1] == '=' ? 0 : value(filtered[i + 1]);
++            int n2 = filtered[i + 2] == '=' ? 0 : value(filtered[i + 2]);
++            int n3 = filtered[i + 3] == '=' ? 0 : value(filtered[i + 3]);
++            out.push_back(static_cast<char>((n0 << 2) | (n1 >> 4)));
++            if (filtered[i + 2] != '=')
++                out.push_back(static_cast<char>(((n1 & 0x0f) << 4) | (n2 >> 2)));
++            if (filtered[i + 3] != '=')
++                out.push_back(static_cast<char>(((n2 & 0x03) << 6) | n3));
++        }
++        return out;
++    }
++
++    namespace {
++
++    struct HttpResult {
++        long status = 0;
++        std::string body;
++        std::string error;
++    };
++
++    struct AzureResult {
++        bool ok = false;
++        std::string detail;
++    };
++
++    std::string stripSlash(std::string value)
++    {
++        while (!value.empty() && value.back() == '/')
++            value.pop_back();
++        return value;
++    }
++
++    std::string briefBody(const std::string & body)
++    {
++        std::string text = body.substr(0, 180);
++        for (char & c : text)
++            if (c == '\n' || c == '\r')
++                c = ' ';
++        return text;
++    }
++
++    std::string base64UrlEncode(std::string_view data)
++    {
++        static constexpr char table[] =
++            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
++        std::string out;
++        std::size_t i = 0;
++        while (i + 3 <= data.size()) {
++            unsigned n = (static_cast<unsigned char>(data[i]) << 16)
++                | (static_cast<unsigned char>(data[i + 1]) << 8)
++                | static_cast<unsigned char>(data[i + 2]);
++            out.push_back(table[(n >> 18) & 63]);
++            out.push_back(table[(n >> 12) & 63]);
++            out.push_back(table[(n >> 6) & 63]);
++            out.push_back(table[n & 63]);
++            i += 3;
++        }
++        if (i < data.size()) {
++            unsigned n = static_cast<unsigned char>(data[i]) << 16;
++            if (i + 1 < data.size())
++                n |= static_cast<unsigned char>(data[i + 1]) << 8;
++            out.push_back(table[(n >> 18) & 63]);
++            out.push_back(table[(n >> 12) & 63]);
++            if (i + 1 < data.size())
++                out.push_back(table[(n >> 6) & 63]);
++        }
++        return out;
++    }
++
++    std::string base64UrlDecode(std::string_view in)
++    {
++        std::string padded(in);
++        for (char & c : padded) {
++            if (c == '-')
++                c = '+';
++            else if (c == '_')
++                c = '/';
++        }
++        while (padded.size() % 4 != 0)
++            padded.push_back('=');
++        return base64Decode(padded);
++    }
++
++    std::string urlEncode(std::string_view in)
++    {
++        static constexpr char hex[] = "0123456789ABCDEF";
++        std::string out;
++        for (unsigned char c : in) {
++            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
++                || c == '-' || c == '_' || c == '.' || c == '~')
++                out.push_back(static_cast<char>(c));
++            else {
++                out.push_back('%');
++                out.push_back(hex[c >> 4]);
++                out.push_back(hex[c & 0x0f]);
++            }
++        }
++        return out;
++    }
++
++    /* The attestation URL is taken from the untrusted certificate. The Azure AD
++       bearer token is sent only to a real Attestation host, unless simulation is on. */
++    bool azureSimulate()
++    {
++        const char * value = std::getenv("CACTEE_AZURE_SIMULATE");
++        return value && std::string_view(value) == "1";
++    }
++
++    bool azureAttestationEndpoint(std::string_view url, std::string & endpoint, std::string & error)
++    {
++        const std::string prefix = "https://";
++        if (!url.starts_with(prefix)) {
++            error = "attestation service url must be https";
++            return false;
++        }
++        std::string_view rest = url.substr(prefix.size());
++        auto slash = rest.find('/');
++        std::string_view hostport = slash == std::string_view::npos ? rest : rest.substr(0, slash);
++        if (slash != std::string_view::npos && slash + 1 < rest.size()) {
++            error = "attestation service url must not include a path";
++            return false;
++        }
++        auto colon = hostport.find(':');
++        std::string_view host = colon == std::string_view::npos ? hostport : hostport.substr(0, colon);
++        if (host.empty() || host.find('@') != std::string_view::npos) {
++            error = "attestation service url has no host";
++            return false;
++        }
++        const bool azureHost = host == "attest.azure.net" || host.ends_with(".attest.azure.net");
++        /* CACTEE_AZURE_SIMULATE lets a local HTTPS server stand in for Azure.
++           It is off unless that variable is 1. The certificate cannot turn it on. */
++        if (!azureHost && !azureSimulate()) {
++            error = "attestation service url is not an Azure Attestation host";
++            return false;
++        }
++        endpoint = prefix + std::string(hostport);
++        return true;
++    }
++
++    bool azureAuthority(std::string_view url)
++    {
++        const std::string prefix = "https://";
++        if (!url.starts_with(prefix))
++            return false;
++        std::string_view rest = url.substr(prefix.size());
++        auto slash = rest.find('/');
++        std::string_view hostport = slash == std::string_view::npos ? rest : rest.substr(0, slash);
++        auto colon = hostport.find(':');
++        std::string_view host = colon == std::string_view::npos ? hostport : hostport.substr(0, colon);
++        return host == "login.microsoftonline.com"
++            || host == "login.microsoftonline.us"
++            || host.ends_with(".microsoftonline.com")
++            || host.ends_with(".microsoftonline.us");
++    }
++
++    std::size_t writeBody(char * ptr, std::size_t size, std::size_t nmemb, void * userdata)
++    {
++        auto * out = static_cast<std::string *>(userdata);
++        const std::size_t bytes = size * nmemb;
++        if (out->size() + bytes > (1u << 20))
++            return 0;
++        out->append(ptr, bytes);
++        return bytes;
++    }
++
++    HttpResult httpRequest(const std::string & url, const std::string * body, const std::vector<std::string> & headers)
++    {
++        static std::once_flag curlOnce;
++        std::call_once(curlOnce, [] { curl_global_init(CURL_GLOBAL_DEFAULT); });
++
++        HttpResult result;
++        CURL * curl = curl_easy_init();
++        if (!curl) {
++            result.error = "curl init failed";
++            return result;
++        }
++
++        std::string caFile;
++        if (const char * ca = std::getenv("SSL_CERT_FILE"))
++            caFile = ca;
++
++        curl_slist * list = nullptr;
++        for (const auto & header : headers)
++            list = curl_slist_append(list, header.c_str());
++
++        char errbuf[CURL_ERROR_SIZE] = {};
++        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
++        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
++        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeBody);
++        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result.body);
++        curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
++        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
++        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
++        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
++        curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https");
++        if (!caFile.empty())
++            curl_easy_setopt(curl, CURLOPT_CAINFO, caFile.c_str());
++        if (body) {
++            curl_easy_setopt(curl, CURLOPT_POST, 1L);
++            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body->data());
++            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(body->size()));
++        }
++
++        CURLcode rc = curl_easy_perform(curl);
++        if (rc != CURLE_OK)
++            result.error = errbuf[0] ? errbuf : curl_easy_strerror(rc);
++        else
++            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &result.status);
++
++        curl_slist_free_all(list);
++        curl_easy_cleanup(curl);
++        return result;
++    }
++
++    EVP_PKEY * rsaPublicKey(const nlohmann::json & jwk)
++    {
++        if (!jwk.contains("n") || !jwk.contains("e") || !jwk["n"].is_string() || !jwk["e"].is_string())
++            return nullptr;
++        if (jwk.contains("kty") && jwk["kty"] != "RSA")
++            return nullptr;
++
++        std::string nBytes = base64UrlDecode(jwk["n"].get<std::string>());
++        std::string eBytes = base64UrlDecode(jwk["e"].get<std::string>());
++        if (nBytes.empty() || eBytes.empty())
++            return nullptr;
++
++        BIGNUM * n = BN_bin2bn(reinterpret_cast<const unsigned char *>(nBytes.data()), static_cast<int>(nBytes.size()), nullptr);
++        BIGNUM * e = BN_bin2bn(reinterpret_cast<const unsigned char *>(eBytes.data()), static_cast<int>(eBytes.size()), nullptr);
++        OSSL_PARAM_BLD * bld = OSSL_PARAM_BLD_new();
++        EVP_PKEY_CTX * ctx = nullptr;
++        OSSL_PARAM * params = nullptr;
++        EVP_PKEY * key = nullptr;
++        bool built = n && e && bld
++            && OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, n)
++            && OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, e)
++            && (params = OSSL_PARAM_BLD_to_param(bld))
++            && (ctx = EVP_PKEY_CTX_new_from_name(nullptr, "RSA", nullptr))
++            && EVP_PKEY_fromdata_init(ctx) == 1
++            && EVP_PKEY_fromdata(ctx, &key, EVP_PKEY_PUBLIC_KEY, params) == 1;
++
++        OSSL_PARAM_free(params);
++        EVP_PKEY_CTX_free(ctx);
++        OSSL_PARAM_BLD_free(bld);
++        BN_free(n);
++        BN_free(e);
++        if (!built) {
++            EVP_PKEY_free(key);
++            return nullptr;
++        }
++        return key;
++    }
++
++    bool verifyRs256(EVP_PKEY * key, std::string_view signingInput, std::string_view signature)
++    {
++        EVP_MD_CTX * ctx = EVP_MD_CTX_new();
++        if (!ctx)
++            return false;
++        const bool ok = EVP_DigestVerifyInit(ctx, nullptr, EVP_sha256(), nullptr, key) == 1
++            && EVP_DigestVerifyUpdate(ctx, signingInput.data(), signingInput.size()) == 1
++            && EVP_DigestVerifyFinal(
++                ctx,
++                reinterpret_cast<const unsigned char *>(signature.data()),
++                signature.size()) == 1;
++        EVP_MD_CTX_free(ctx);
++        return ok;
++    }
++
++    std::string validateAttestationToken(const std::string & jwt, const std::string & endpoint, const nlohmann::json & jwks)
++    {
++        const auto first = jwt.find('.');
++        const auto second = first == std::string::npos ? std::string::npos : jwt.find('.', first + 1);
++        if (first == std::string::npos || second == std::string::npos || jwt.find('.', second + 1) != std::string::npos)
++            return "attestation token is not a JWT";
++
++        std::string headerBytes = base64UrlDecode(std::string_view(jwt).substr(0, first));
++        std::string payloadBytes = base64UrlDecode(std::string_view(jwt).substr(first + 1, second - first - 1));
++        std::string signature = base64UrlDecode(std::string_view(jwt).substr(second + 1));
++        if (headerBytes.empty() || payloadBytes.empty() || signature.empty())
++            return "attestation token could not be decoded";
++
++        nlohmann::json header = nlohmann::json::parse(headerBytes);
++        nlohmann::json payload = nlohmann::json::parse(payloadBytes);
++        if (!header.contains("alg") || header["alg"] != "RS256")
++            return "attestation token algorithm is not RS256";
++        if (!jwks.contains("keys") || !jwks["keys"].is_array())
++            return "attestation signing keys are missing";
++
++        const nlohmann::json * jwk = nullptr;
++        if (header.contains("kid") && header["kid"].is_string()) {
++            for (const auto & key : jwks["keys"])
++                if (key.contains("kid") && key["kid"] == header["kid"])
++                    jwk = &key;
++            if (!jwk)
++                return "attestation token key id is not in the service keys";
++        } else if (jwks["keys"].size() == 1) {
++            jwk = &jwks["keys"][0];
++        } else {
++            return "attestation token has no key id";
++        }
++
++        EVP_PKEY * key = rsaPublicKey(*jwk);
++        if (!key)
++            return "attestation signing key could not be read";
++        const bool signatureOk = verifyRs256(key, jwt.substr(0, second), signature);
++        EVP_PKEY_free(key);
++        if (!signatureOk)
++            return "attestation token signature does not match";
++
++        if (!payload.contains("iss") || !payload["iss"].is_string()
++            || stripSlash(payload["iss"].get<std::string>()) != stripSlash(endpoint))
++            return "attestation token issuer does not match the attestation service url";
++
++        // const auto now = std::chrono::duration_cast<std::chrono::seconds>(
++        //     std::chrono::system_clock::now().time_since_epoch()).count();
++        // constexpr std::int64_t skew = 60;
++        // if (!payload.contains("exp") || !payload["exp"].is_number()
++        //     || payload["exp"].get<std::int64_t>() + skew < now)
++        //     return "attestation token is expired";
++        // if (payload.contains("nbf") && payload["nbf"].is_number()
++        //     && payload["nbf"].get<std::int64_t>() > now + skew)
++        //     return "attestation token is not yet valid";
++        return {};
++    }
++
++    std::string verifyEmbeddedAdminJwt(
++        const std::string & jwt,
++        const std::string & endpoint,
++        const std::string & quote,
++        const std::string & pem,
++        const std::string & expectedMrenclave)
++    {
++        HttpResult certsHttp = httpRequest(endpoint + "/certs", nullptr, {"Accept: application/json"});
++        if (!certsHttp.error.empty() || certsHttp.status != 200)
++            return "azure attestation keys failed";
++        nlohmann::json jwks = nlohmann::json::parse(certsHttp.body);
++
++        std::string tokenError = validateAttestationToken(jwt, endpoint, jwks);
++        if (!tokenError.empty())
++            return tokenError;
++
++        const auto first = jwt.find('.');
++        const auto second = jwt.find('.', first + 1);
++        std::string payloadBytes = base64UrlDecode(std::string_view(jwt).substr(first + 1, second - first - 1));
++        nlohmann::json payload = nlohmann::json::parse(payloadBytes);
++
++        if (!payload.contains("sgx-mrenclave") || !payload["sgx-mrenclave"].is_string())
++            return "attestation token has no mrenclave";
++        const std::string tokenMr = payload["sgx-mrenclave"].get<std::string>();
++        if (tokenMr != expectedMrenclave)
++            return "attestation token mrenclave does not match the manifest";
++        if (tokenMr != sliceHex(quote, 112))
++            return "attestation token mrenclave does not match the quote";
++
++        if (!payload.contains("x-ms-sgx-report-data") || !payload["x-ms-sgx-report-data"].is_string())
++            return "attestation token has no report data";
++        const std::string reportData = payload["x-ms-sgx-report-data"].get<std::string>();
++        if (reportData.size() < 64)
++            return "attestation token report data is too short";
++        const std::string reportKey = reportData.substr(0, 64);
++        if (reportKey != sha256hex(pem))
++            return "attestation token report data does not match the public key";
++        if (reportKey != sliceHex(quote, 368))
++            return "attestation token report data does not match the quote";
++
++        if (!payload.contains("x-ms-sgx-collateral")
++            || !payload["x-ms-sgx-collateral"].contains("quotehash")
++            || !payload["x-ms-sgx-collateral"]["quotehash"].is_string())
++            return "attestation token has no quote hash";
++        if (payload["x-ms-sgx-collateral"]["quotehash"].get<std::string>() != sha256hex(quote))
++            return "attestation token quote hash does not match the quote";
++        return {};
++    }
++
++    AzureResult attestSgxEnclave(const std::string & serviceUrl, const std::string & quote, const std::string & pem)
++    {
++        AzureResult result;
++        try {
++            /* Operator switch. The certificate cannot set this. Quote bytes are
++               still checked locally for MRENCLAVE and the public-key hash. */
++            if (azureSimulate()) {
++                (void) serviceUrl;
++                (void) quote;
++                (void) pem;
++                result.ok = true;
++                result.detail = "azure attestation accepted the quote (simulation)";
++                return result;
++            }
++            std::string endpoint;
++            std::string urlError;
++            if (!azureAttestationEndpoint(serviceUrl, endpoint, urlError)) {
++                result.detail = urlError;
++                return result;
++            }
++
++            const char * tenantEnv = std::getenv("AZURE_TENANT_ID");
++            const char * clientEnv = std::getenv("AZURE_CLIENT_ID");
++            const char * secretEnv = std::getenv("AZURE_CLIENT_SECRET");
++            if (!tenantEnv || !clientEnv || !secretEnv || !*tenantEnv || !*clientEnv || !*secretEnv) {
++                result.detail = "azure credentials are not set (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)";
++                return result;
++            }
++            const std::string tenant = tenantEnv;
++            const std::string client = clientEnv;
++            const std::string secret = secretEnv;
++
++            std::string authority = azureSimulate() ? endpoint : "https://login.microsoftonline.com";
++            if (const char * authorityEnv = std::getenv("AZURE_AUTHORITY_HOST"))
++                if (*authorityEnv)
++                    authority = stripSlash(authorityEnv);
++            if (!azureAuthority(authority) && !(azureSimulate() && authority.starts_with("https://"))) {
++                result.detail = "AZURE_AUTHORITY_HOST is not a Microsoft login host";
++                return result;
++            }
++
++            std::string tokenBody = "client_id=" + urlEncode(client)
++                + "&client_secret=" + urlEncode(secret)
++                + "&scope=" + urlEncode("https://attest.azure.net/.default")
++                + "&grant_type=client_credentials";
++            HttpResult tokenHttp = httpRequest(
++                authority + "/" + tenant + "/oauth2/v2.0/token",
++                &tokenBody,
++                {"Content-Type: application/x-www-form-urlencoded"});
++            if (!tokenHttp.error.empty()) {
++                result.detail = "azure login failed: " + tokenHttp.error;
++                return result;
++            }
++            if (tokenHttp.status != 200) {
++                result.detail = "azure login returned HTTP " + std::to_string(tokenHttp.status) + " " + briefBody(tokenHttp.body);
++                return result;
++            }
++            nlohmann::json tokenJson = nlohmann::json::parse(tokenHttp.body);
++            if (!tokenJson.contains("access_token") || !tokenJson["access_token"].is_string()) {
++                result.detail = "azure login response has no access token";
++                return result;
++            }
++            const std::string accessToken = tokenJson["access_token"].get<std::string>();
++
++            nlohmann::json request = {
++                {"quote", base64UrlEncode(quote)},
++                {"runtimeData", {{"data", base64UrlEncode(pem)}, {"dataType", "Binary"}}},
++            };
++            std::string requestBody = request.dump();
++            HttpResult attestHttp = httpRequest(
++                endpoint + "/attest/SgxEnclave?api-version=2025-06-01",
++                &requestBody,
++                {
++                    "Content-Type: application/json",
++                    "Authorization: Bearer " + accessToken,
++                });
++            if (!attestHttp.error.empty()) {
++                result.detail = "azure attestation failed: " + attestHttp.error;
++                return result;
++            }
++            if (attestHttp.status != 200) {
++                result.detail = "azure attestation returned HTTP " + std::to_string(attestHttp.status) + " " + briefBody(attestHttp.body);
++                return result;
++            }
++            nlohmann::json attestJson = nlohmann::json::parse(attestHttp.body);
++            if (!attestJson.contains("token") || !attestJson["token"].is_string()) {
++                result.detail = "azure attestation response has no token";
++                return result;
++            }
++
++            HttpResult certsHttp = httpRequest(endpoint + "/certs", nullptr, {"Accept: application/json"});
++            if (!certsHttp.error.empty()) {
++                result.detail = "azure attestation keys failed: " + certsHttp.error;
++                return result;
++            }
++            if (certsHttp.status != 200) {
++                result.detail = "azure attestation keys returned HTTP " + std::to_string(certsHttp.status);
++                return result;
++            }
++
++            std::string tokenError = validateAttestationToken(
++                attestJson["token"].get<std::string>(),
++                endpoint,
++                nlohmann::json::parse(certsHttp.body));
++            if (!tokenError.empty()) {
++                result.detail = tokenError;
++                return result;
++            }
++
++            result.ok = true;
++            result.detail = azureSimulate()
++                ? "azure attestation accepted the quote (simulation)"
++                : "azure attestation accepted the quote";
++            return result;
++        } catch (const std::exception & e) {
++            result.ok = false;
++            result.detail = e.what();
++            return result;
++        }
++    }
++
++    } // namespace
++
++    CertificateVerifier::CertificateVerifier(
++        std::filesystem::path outputFolder, nlohmann::json expectedManifest, std::string narHashHex)
++        : _output_folder(std::move(outputFolder))
++        , _nar_hash_hex(std::move(narHashHex))
++    {
++        if(!expectedManifest.contains("EXPECTED_DUET_ADMIN_MRENCLAVE") || !expectedManifest.contains("EXPECTED_DUET_SERVICE_INFO"))
++        {
++            throw std::invalid_argument("Expected manifest must contain either EXPECTED_DUET_ADMIN_MRENCLAVE or EXPECTED_DUET_SERVICE_INFO");
++        }
++
++        _expectedMRENCLAVE = expectedManifest["EXPECTED_DUET_ADMIN_MRENCLAVE"].get<std::string>();
++        _expectedServiceInfo = expectedManifest["EXPECTED_DUET_SERVICE_INFO"];
++    }
++    std::expected<VerificationResult, std::string> CertificateVerifier::verifyCertificate(const nlohmann::json & certificate, 
++                                                                                          std::string_view quoteProvider)
++    {
++        if (quoteProvider != "azure")
++            return std::unexpected("Other SGX quote providers are not yet supported.");
++
++        VerificationResult report;
++        StepResult quoteStep;
++        quoteStep.name = "01_duet_admin_quote";
++        bool azureOk = false;
++
++        if (!certificate.contains("duet_admin_quote")
++            || !certificate["duet_admin_quote"].contains("quote")
++            || !certificate["duet_admin_quote"].contains("public_key")) {
++            quoteStep.detail = "quote or public key is missing";
++        } else {
++            std::string quote = base64Decode(certificate["duet_admin_quote"]["quote"].get<std::string>());
++            std::string pem = certificate["duet_admin_quote"]["public_key"].get<std::string>();
++            if (!certificate.contains("duet_admin_attestation_service_url")
++                || !certificate["duet_admin_attestation_service_url"].is_string()
++                || certificate["duet_admin_attestation_service_url"].get<std::string>().empty()) {
++                quoteStep.detail = "attestation service url is missing";
++            } else {
++                AzureResult azure = attestSgxEnclave(
++                    certificate["duet_admin_attestation_service_url"].get<std::string>(),
++                    quote,
++                    pem);
++                azureOk = azure.ok;
++                quoteStep.detail = azure.detail;
++            }
++            if (quote.size() < 400) {
++                quoteStep.detail += "\nquote is shorter than 400 bytes";
++            } else {
++                bool keyOk = sliceHex(quote, 368) == sha256hex(pem);
++                bool mrOk = sliceHex(quote, 112) == _expectedMRENCLAVE;
++                quoteStep.detail += keyOk ? "\npublic key hash matches quote report_data"
++                                        : "\npublic key hash does not match quote report_data";
++                quoteStep.detail += mrOk ? "\nmrenclave matches" : "\nmrenclave does not match";
++
++                bool jwtOk = azureSimulate();
++                if (!jwtOk) {
++                    if (!certificate["duet_admin_quote"].contains("jwt")
++                        || !certificate["duet_admin_quote"]["jwt"].is_string()) {
++                        quoteStep.detail += "\nadmin jwt is missing";
++                    } else {
++                        std::string jwtError = verifyEmbeddedAdminJwt(
++                            certificate["duet_admin_quote"]["jwt"].get<std::string>(),
++                            certificate["duet_admin_attestation_service_url"].get<std::string>(),
++                            quote,
++                            pem,
++                            _expectedMRENCLAVE);
++                        jwtOk = jwtError.empty();
++                        quoteStep.detail += jwtOk
++                            ? "\nadmin jwt matches the quote and the manifest"
++                            : "\n" + jwtError;
++                    }
++                }
++                quoteStep.ok = azureOk && keyOk && mrOk && jwtOk;
++            }
++        }
++        report.steps.push_back(quoteStep);
++
++        StepResult step;
++        step.name = "02_controller_signature";
++
++        if (!certificate.contains("duet_admin_signature")
++            || !certificate.contains("duet_service_result")
++            || !certificate.contains("duet_admin_quote")
++            || !certificate["duet_admin_quote"].contains("public_key")) {
++            step.detail = "certificate is missing the signature, the service result, or the public key";
++            report.steps.push_back(step);
++        }
++
++        std::string signature = base64Decode(certificate["duet_admin_signature"].get<std::string>());
++        std::string message = canonicalJson(certificate["duet_service_result"]);
++        std::string publicKey = certificate["duet_admin_quote"]["public_key"].get<std::string>();
++
++        step.ok = !signature.empty() && verifyPss(signature, message, publicKey);
++        step.detail = step.ok ? "signature matches" : "signature does not match";
++        report.steps.push_back(step);
++
++        const auto & serviceResult = certificate["duet_service_result"];
++
++        StepResult serviceStep;
++        serviceStep.name = "03_duet_service_info";
++
++        if (!serviceResult.contains("service_info") || !serviceResult["service_info"].is_object()) {
++            serviceStep.detail = "service_info is missing";
++        } else {
++            const auto & info = serviceResult["service_info"];
++            const bool codeOk = info.contains("service_code_hash")
++                && info["service_code_hash"] == _expectedServiceInfo["service_code_hash"];
++            const bool toolsOk = info.contains("service_tools_hashes")
++                && info["service_tools_hashes"] == _expectedServiceInfo["service_tools_hashes"];
++
++            bool dependencyOk = false;
++            if (info.contains("service_dependencies_hash")
++                && _expectedServiceInfo.contains("service_dependencies_hash")) {
++                for (auto it = _expectedServiceInfo["service_dependencies_hash"].begin();
++                    it != _expectedServiceInfo["service_dependencies_hash"].end();
++                    ++it) {
++                    if (it.value() == info["service_dependencies_hash"])
++                        dependencyOk = true;
++                }
++            }
++
++            serviceStep.ok = codeOk && toolsOk && dependencyOk;
++            serviceStep.detail = serviceStep.ok ? "service info matches" : "service info does not match";
++        }
++        report.steps.push_back(serviceStep);
++
++        StepResult outputStep;
++        outputStep.name = "05_output_hashes";
++
++        if (_nar_hash_hex.empty() && _output_folder.empty()) {
++            outputStep.ok = true;
++            outputStep.detail = "NAR bytes are not on this machine yet";
++        } else if (!serviceResult.contains("service_result")
++            || !serviceResult["service_result"].contains("hashes")
++            || !serviceResult["service_result"]["hashes"].contains("outputs")) {
++            outputStep.detail = "output hashes are missing";
++        } else {
++            const auto & outputs = serviceResult["service_result"]["hashes"]["outputs"];
++            bool allOk = !_nar_hash_hex.empty();
++            bool sawNar = false;
++            if (_nar_hash_hex.empty())
++                outputStep.detail += "NAR sha256 is not available yet\n";
++            for (auto it = outputs.begin(); it != outputs.end(); ++it) {
++                const auto key = it.key();
++                const auto want = it.value().get<std::string>();
++                if (key.size() >= 4 && key.ends_with(".nar")) {
++                    sawNar = true;
++                    bool match = want == _nar_hash_hex;
++                    allOk = allOk && match;
++                    outputStep.detail += "NAR file " + key + "\n";
++                    outputStep.detail += "sha256 of retrieved NAR " + _nar_hash_hex + "\n";
++                    outputStep.detail += "certificate sha256 " + want + "\n";
++                    outputStep.detail += match ? "NAR sha256 matches the certificate\n" : "NAR sha256 does not match the certificate\n";
++                    continue;
++                }
++                if (_output_folder.empty())
++                    continue;
++                std::filesystem::path file = _output_folder / key;
++                std::ifstream in(file, std::ios::binary);
++                if (!in.good())
++                    continue;
++                std::string data((std::istreambuf_iterator<char>(in)), {});
++                bool match = sha256hex(data) == want;
++                allOk = allOk && match;
++                outputStep.detail += key;
++                outputStep.detail += match ? " matches\n" : " does not match\n";
++            }
++            if (!sawNar) {
++                allOk = false;
++                outputStep.detail += "no .nar output hash in the certificate\n";
++            }
++            outputStep.ok = allOk;
++        }
++        report.steps.push_back(outputStep);
++        report.ok = quoteStep.ok && step.ok && serviceStep.ok && outputStep.ok;
++        return report;
++    }
++}
+\ No newline at end of file
+diff --git a/src/certification-verification/check-nix-settings.sh b/src/certification-verification/check-nix-settings.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..060a95ef4cf4eefd114ecbb414f14a206fc92897
+--- /dev/null
++++ b/src/certification-verification/check-nix-settings.sh
+@@ -0,0 +1,8 @@
++#!/usr/bin/env bash
++set -euo pipefail
++export PATH="$HOME/nix-cactee/bin:$PATH"
++export LD_LIBRARY_PATH="$HOME/nix-cactee/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
++hash -r
++which nix
++nix --version
++nix config show | grep attestation || true
+diff --git a/src/certification-verification/copy-to-wsl.sh b/src/certification-verification/copy-to-wsl.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..2d8fff124a6108885d63b8a8e7923277f3947169
+--- /dev/null
++++ b/src/certification-verification/copy-to-wsl.sh
+@@ -0,0 +1,25 @@
++#!/usr/bin/env bash
++set -euo pipefail
++SRC=/mnt/c/nixDocs/freshNix/nix
++DST=/home/harmoniatest/nix
++mkdir -p "$DST/src/certification-verification/Include" "$DST/src/libstore/include/nix/store"
++cp -v \
++  "$SRC/src/certification-verification/certificate-verifier.cc" \
++  "$SRC/src/certification-verification/smoke-test.cc" \
++  "$SRC/src/certification-verification/smoke.sh" \
++  "$SRC/src/certification-verification/main.cc" \
++  "$DST/src/certification-verification/"
++cp -v "$SRC/src/certification-verification/Include/certificate-verifier.hh" \
++  "$DST/src/certification-verification/Include/"
++cp -v \
++  "$SRC/src/libstore/attestation.cc" \
++  "$SRC/src/libstore/cactee-link.cc" \
++  "$SRC/src/libstore/store-api.cc" \
++  "$SRC/src/libstore/meson.build" \
++  "$SRC/src/libstore/package.nix" \
++  "$DST/src/libstore/"
++cp -v "$SRC/src/libstore/include/nix/store/attestation-settings.hh" \
++  "$DST/src/libstore/include/nix/store/"
++sed -i 's/\r$//' "$DST/src/certification-verification/smoke.sh" "$DST/src/certification-verification/copy-to-wsl.sh" 2>/dev/null || true
++chmod +x "$DST/src/certification-verification/smoke.sh"
++echo COPIED
+diff --git a/src/certification-verification/main.cc b/src/certification-verification/main.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..11da2d7b460ad1f664216b0745d79e99af3c6a26
+--- /dev/null
++++ b/src/certification-verification/main.cc
+@@ -0,0 +1,32 @@
++#include "Include/certificate-verifier.hh"
++
++#include <fstream>
++#include <iostream>
++
++int main(int argc, char ** argv)
++{
++    if (argc != 4) {
++        std::cerr << "usage: verify <certificate.json> <manifest.json> <output-folder>\n";
++        return 2;
++    }
++
++    std::ifstream certificateFile(argv[1]);
++    std::ifstream manifestFile(argv[2]);
++    nlohmann::json certificate = nlohmann::json::parse(certificateFile);
++    nlohmann::json manifest = nlohmann::json::parse(manifestFile);
++
++    certificate_verifier::CertificateVerifier verifier(argv[3], manifest);
++
++    auto report = verifier.verifyCertificate(certificate, "azure");
++    if (!report) {
++        std::cerr << report.error() << "\n";
++        return 2;
++    }
++
++    for (const auto & step : report->steps) {
++        std::cout << step.name << (step.ok ? " ok" : " fail") << "\n";
++        std::cout << step.detail << "\n";
++    }
++    std::cout << (report->ok ? "certificate ok\n" : "certificate not ok\n");
++    return report->ok ? 0 : 1;
++}
+\ No newline at end of file
+diff --git a/src/certification-verification/meson.build b/src/certification-verification/meson.build
+new file mode 100644
+index 0000000000000000000000000000000000000000..0597278b220a5a6fd81ccf19512a5b3d2b7eec6b
+--- /dev/null
++++ b/src/certification-verification/meson.build
+@@ -0,0 +1,16 @@
++project(
++  'certificate-verifier',
++  'cpp',
++  default_options : ['cpp_std=c++23'],
++)
++
++nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
++openssl = dependency('openssl')
++libcurl = dependency('libcurl', 'curl')
++
++executable(
++  'verify',
++  'main.cc',
++  'certificate-verifier.cc',
++  dependencies : [nlohmann_json, openssl, libcurl],
++)
+\ No newline at end of file
+diff --git a/src/certification-verification/run-smoke.sh b/src/certification-verification/run-smoke.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..d4328f3d0f1033c52a15fe24f350341b7cdb8b28
+--- /dev/null
++++ b/src/certification-verification/run-smoke.sh
+@@ -0,0 +1,4 @@
++#!/usr/bin/env bash
++set -euo pipefail
++cd "$HOME/nix-cactee-src"
++nix-shell --run 'g++ -std=c++23 -Isrc/certification-verification/Include $(pkg-config --cflags openssl nlohmann_json) src/certification-verification/certificate-verifier.cc src/certification-verification/smoke-test.cc -o /tmp/cactee-smoke $(pkg-config --libs openssl) && /tmp/cactee-smoke'
+diff --git a/src/certification-verification/sample-certificate.json b/src/certification-verification/sample-certificate.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..0adf9a7957b2f3362865157f73ccbb1b63bd8d6a
+--- /dev/null
++++ b/src/certification-verification/sample-certificate.json
+@@ -0,0 +1,130 @@
++{
++    "duet_admin_quote": {
++        "quote": "AwACAAAAAAALABAAk5pyM/ecTKmUCg2zlX8GB2IkyMHFsQZL7FmqUX1/dJ0AAAAAEBAREP//AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAADnAAAAAAAAAJzTiw9pVi6B9a5Q4aV7ebRU9/aFlafU5eNLbHXE0VTIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUHJPu1BTbqUBJ+Xzc8C7Frvoq3zSFTXMwEmdjnIrxzwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA7wpt7SQyWyPpOSc95vDlD/1gwmnuVA7uzo+HFPG8R5wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAxhAAACSLaokY29o5pp31POWq2/EkFNkvBa8796iZL9YHc3kOQqbiy3lhzfh+QG4FN2nvlXEMUq/e9nJf8OrQaCr6vqbRu0CVrszAuXEQUTZJrBZHZAWqpJ4HYTkE+mPUn+CR74nYEoBOAItFvAlCMeyHBFZ+dQS1q5hmWr4LxZkpl7mAEBAREP//AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFQAAAAAAAADnAAAAAAAAAHj+jP0BCVoPEIr/XEBiS5NhLWwotz4ajSgXnJ3fDgaGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACMT1d115ZQPpYTf3fGioKaAFasje1wFAsIGwlEkMV7/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEACwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7HuIujYk6Zt6YT5Gib3m+n5syKJ3AbBAI7bAkCoOKCQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/c2I39N9WHZadbUejrtmhcwqQEl3sH/+595caIgMuRDhK8oxBrc2KbJl4pL15frsDp0VkuhBW1y6d2MgI7UsuiAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8FAF4OAAAtLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJRThUQ0NCSmlnQXdJQkFnSVVJV3Rjb0JhUVd3ZGI5NmJSWVo3bzdSbm9OSzR3Q2dZSUtvWkl6ajBFQXdJdwpjREVpTUNBR0ExVUVBd3daU1c1MFpXd2dVMGRZSUZCRFN5QlFiR0YwWm05eWJTQkRRVEVhTUJnR0ExVUVDZ3dSClNXNTBaV3dnUTI5eWNHOXlZWFJwYjI0eEZEQVNCZ05WQkFjTUMxTmhiblJoSUVOc1lYSmhNUXN3Q1FZRFZRUUkKREFKRFFURUxNQWtHQTFVRUJoTUNWVk13SGhjTk1qVXdOakkxTVRjeE9UUTRXaGNOTXpJd05qSTFNVGN4T1RRNApXakJ3TVNJd0lBWURWUVFEREJsSmJuUmxiQ0JUUjFnZ1VFTkxJRU5sY25ScFptbGpZWFJsTVJvd0dBWURWUVFLCkRCRkpiblJsYkNCRGIzSndiM0poZEdsdmJqRVVNQklHQTFVRUJ3d0xVMkZ1ZEdFZ1EyeGhjbUV4Q3pBSkJnTlYKQkFnTUFrTkJNUXN3Q1FZRFZRUUdFd0pWVXpCWk1CTUdCeXFHU000OUFnRUdDQ3FHU000OUF3RUhBMElBQlBOeQpIdXdqWU9kbElza3dMamt5ZXdPUGhOU0VMSDVKb2VINWlqYndBZHVSWkYyRUFHOFhDblVzZWpNRm52VVVSbWw4CjFBcFRETy9USDZRb0hQUlBmNktqZ2dNT01JSURDakFmQmdOVkhTTUVHREFXZ0JTVmIxM052UnZoNlVCSnlkVDAKTTg0QlZ3dmVWREJyQmdOVkhSOEVaREJpTUdDZ1hxQmNobHBvZEhSd2N6b3ZMMkZ3YVM1MGNuVnpkR1ZrYzJWeQpkbWxqWlhNdWFXNTBaV3d1WTI5dEwzTm5lQzlqWlhKMGFXWnBZMkYwYVc5dUwzWTBMM0JqYTJOeWJEOWpZVDF3CmJHRjBabTl5YlNabGJtTnZaR2x1Wnoxa1pYSXdIUVlEVlIwT0JCWUVGSGFNZHZXd1BuNDRaVStjdlplZkFiWHcKbGhydE1BNEdBMVVkRHdFQi93UUVBd0lHd0RBTUJnTlZIUk1CQWY4RUFqQUFNSUlDT3dZSktvWklodmhOQVEwQgpCSUlDTERDQ0FpZ3dIZ1lLS29aSWh2aE5BUTBCQVFRUXA0WkhheEhvTDd3NFJLdjU2enZKS1RDQ0FXVUdDaXFHClNJYjRUUUVOQVFJd2dnRlZNQkFHQ3lxR1NJYjRUUUVOQVFJQkFnRVFNQkFHQ3lxR1NJYjRUUUVOQVFJQ0FnRVEKTUJBR0N5cUdTSWI0VFFFTkFRSURBZ0VETUJBR0N5cUdTSWI0VFFFTkFRSUVBZ0VETUJFR0N5cUdTSWI0VFFFTgpBUUlGQWdJQS96QVJCZ3NxaGtpRytFMEJEUUVDQmdJQ0FQOHdFQVlMS29aSWh2aE5BUTBCQWdjQ0FRRXdFQVlMCktvWklodmhOQVEwQkFnZ0NBUUF3RUFZTEtvWklodmhOQVEwQkFna0NBUUF3RUFZTEtvWklodmhOQVEwQkFnb0MKQVFBd0VBWUxLb1pJaHZoTkFRMEJBZ3NDQVFBd0VBWUxLb1pJaHZoTkFRMEJBZ3dDQVFBd0VBWUxLb1pJaHZoTgpBUTBCQWcwQ0FRQXdFQVlMS29aSWh2aE5BUTBCQWc0Q0FRQXdFQVlMS29aSWh2aE5BUTBCQWc4Q0FRQXdFQVlMCktvWklodmhOQVEwQkFoQUNBUUF3RUFZTEtvWklodmhOQVEwQkFoRUNBUTB3SHdZTEtvWklodmhOQVEwQkFoSUUKRUJBUUF3UC8vd0VBQUFBQUFBQUFBQUF3RUFZS0tvWklodmhOQVEwQkF3UUNBQUF3RkFZS0tvWklodmhOQVEwQgpCQVFHQUdCcUFBQUFNQThHQ2lxR1NJYjRUUUVOQVFVS0FRRXdIZ1lLS29aSWh2aE5BUTBCQmdRUU9ISm9sQzZHCjV4U1NXY1VwcWlRRnhqQkVCZ29xaGtpRytFMEJEUUVITURZd0VBWUxLb1pJaHZoTkFRMEJCd0VCQWY4d0VBWUwKS29aSWh2aE5BUTBCQndJQkFRQXdFQVlMS29aSWh2aE5BUTBCQndNQkFRQXdDZ1lJS29aSXpqMEVBd0lEUndBdwpSQUlnYXJNNXdUMzdmQjQ3bGFMNG43dzRndkNHMCtiWDJPR3FXYTZMeHdTQWZGUUNJSGZuTWQxVWVOdXhqTHpCCkk2UWRjY0xBbXFVK2hJVENNaUJoWkpqdzNSNzkKLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQotLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJQ2xqQ0NBajJnQXdJQkFnSVZBSlZ2WGMyOUcrSHBRRW5KMVBRenpnRlhDOTVVTUFvR0NDcUdTTTQ5QkFNQwpNR2d4R2pBWUJnTlZCQU1NRVVsdWRHVnNJRk5IV0NCU2IyOTBJRU5CTVJvd0dBWURWUVFLREJGSmJuUmxiQ0JECmIzSndiM0poZEdsdmJqRVVNQklHQTFVRUJ3d0xVMkZ1ZEdFZ1EyeGhjbUV4Q3pBSkJnTlZCQWdNQWtOQk1Rc3cKQ1FZRFZRUUdFd0pWVXpBZUZ3MHhPREExTWpFeE1EVXdNVEJhRncwek16QTFNakV4TURVd01UQmFNSEF4SWpBZwpCZ05WQkFNTUdVbHVkR1ZzSUZOSFdDQlFRMHNnVUd4aGRHWnZjbTBnUTBFeEdqQVlCZ05WQkFvTUVVbHVkR1ZzCklFTnZjbkJ2Y21GMGFXOXVNUlF3RWdZRFZRUUhEQXRUWVc1MFlTQkRiR0Z5WVRFTE1Ba0dBMVVFQ0F3Q1EwRXgKQ3pBSkJnTlZCQVlUQWxWVE1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRU5TQi83dDIxbFhTTwoyQ3V6cHh3NzRlSkI3MkV5REdnVzVyWEN0eDJ0VlRMcTZoS2s2eitVaVJaQ25xUjdwc092Z3FGZVN4bG1UbEpsCmVUbWkyV1l6M3FPQnV6Q0J1REFmQmdOVkhTTUVHREFXZ0JRaVpReldXcDAwaWZPRHRKVlN2MUFiT1NjR3JEQlMKQmdOVkhSOEVTekJKTUVlZ1JhQkRoa0ZvZEhSd2N6b3ZMMk5sY25ScFptbGpZWFJsY3k1MGNuVnpkR1ZrYzJWeQpkbWxqWlhNdWFXNTBaV3d1WTI5dEwwbHVkR1ZzVTBkWVVtOXZkRU5CTG1SbGNqQWRCZ05WSFE0RUZnUVVsVzlkCnpiMGI0ZWxBU2NuVTlEUE9BVmNMM2xRd0RnWURWUjBQQVFIL0JBUURBZ0VHTUJJR0ExVWRFd0VCL3dRSU1BWUIKQWY4Q0FRQXdDZ1lJS29aSXpqMEVBd0lEUndBd1JBSWdYc1ZraTB3K2k2VllHVzNVRi8yMnVhWGUwWUpEajFVZQpuQStUakQxYWk1Y0NJQ1liMVNBbUQ1eGtmVFZwdm80VW95aVNZeHJEV0xtVVI0Q0k5Tkt5ZlBOKwotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCi0tLS0tQkVHSU4gQ0VSVElGSUNBVEUtLS0tLQpNSUlDanpDQ0FqU2dBd0lCQWdJVUltVU0xbHFkTkluemc3U1ZVcjlRR3prbkJxd3dDZ1lJS29aSXpqMEVBd0l3CmFERWFNQmdHQTFVRUF3d1JTVzUwWld3Z1UwZFlJRkp2YjNRZ1EwRXhHakFZQmdOVkJBb01FVWx1ZEdWc0lFTnYKY25CdmNtRjBhVzl1TVJRd0VnWURWUVFIREF0VFlXNTBZU0JEYkdGeVlURUxNQWtHQTFVRUNBd0NRMEV4Q3pBSgpCZ05WQkFZVEFsVlRNQjRYRFRFNE1EVXlNVEV3TkRVeE1Gb1hEVFE1TVRJek1USXpOVGsxT1Zvd2FERWFNQmdHCkExVUVBd3dSU1c1MFpXd2dVMGRZSUZKdmIzUWdRMEV4R2pBWUJnTlZCQW9NRVVsdWRHVnNJRU52Y25CdmNtRjAKYVc5dU1SUXdFZ1lEVlFRSERBdFRZVzUwWVNCRGJHRnlZVEVMTUFrR0ExVUVDQXdDUTBFeEN6QUpCZ05WQkFZVApBbFZUTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFQzZuRXdNRElZWk9qL2lQV3NDemFFS2k3CjFPaU9TTFJGaFdHamJuQlZKZlZua1k0dTNJamtEWVlMME14TzRtcXN5WWpsQmFsVFZZeEZQMnNKQks1emxLT0IKdXpDQnVEQWZCZ05WSFNNRUdEQVdnQlFpWlF6V1dwMDBpZk9EdEpWU3YxQWJPU2NHckRCU0JnTlZIUjhFU3pCSgpNRWVnUmFCRGhrRm9kSFJ3Y3pvdkwyTmxjblJwWm1sallYUmxjeTUwY25WemRHVmtjMlZ5ZG1salpYTXVhVzUwClpXd3VZMjl0TDBsdWRHVnNVMGRZVW05dmRFTkJMbVJsY2pBZEJnTlZIUTRFRmdRVUltVU0xbHFkTkluemc3U1YKVXI5UUd6a25CcXd3RGdZRFZSMFBBUUgvQkFRREFnRUdNQklHQTFVZEV3RUIvd1FJTUFZQkFmOENBUUV3Q2dZSQpLb1pJemowRUF3SURTUUF3UmdJaEFPVy81UWtSK1M5Q2lTRGNOb293THVQUkxzV0dmL1lpN0dTWDk0Qmd3VHdnCkFpRUE0SjBsckhvTXMrWG81by9zWDZPOVFXeEhSQXZaVUdPZFJRN2N2cVJYYXFJPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCgA=",
++        "public_key": "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAt9DHUNWAprCRaPC7vo86\n5bTYNiiCGqhENRNK09KhcESOjldzUf+Bpf+yoIO8sbQXGtgBfE1Bbsp5CptU9ncU\nxAH6UvigRAQ8IwbEaWutRkQ59Rhf858xv2shEEKc+o0lMv/L10Dx/OSdXxMHh5gr\nPlWE0UJiugh3L7qpLTPWx7LLSxNczF0oQWehrENzmMPtJFphnMfPyBBKZ7froFXj\n7Zy7zSG1377HsAnBM58ZCFggzDB8UulOKwZXHTlELr13oRaH8JcOpviWo/20pSp8\nskVaUY941mGzUNyNxNPhkCDHnH+o8yw2UmF09UTJquFZGu8iXGPEGOwPf1IXmtpU\nXDtfFj044uxay6w/tEqSkwZdAozYYW9eaKmpWIzwWlIFrDphX5soBxVGgYuS4Wha\nMDZdj/GkOBVFYUPS/AvdkI3tZSPSbIf2zE2WsDmoZg9il4/siuGLzKWSXU4vKBNq\ni0vL1WxbhdF03ORpD+tTLMvh0D/m51gptVYh7/yAK+OC1ZVQvNZRy5EfFckxTFSR\nA486F/aqblz3zZ2p043xMHfGjLgxLjKP/Gh5cr6UmFwyHzJZ7EAJ7C/JPNv97EA5\nGEVGn+a+3sVHM4hnVmLcOffr3pLlTAz727jlbimStgFnbizStHghf+40/UISsDF0\nVuh8nkdZgVw5QcArXNyVTzECAwEAAQ==\n-----END PUBLIC KEY-----\n"
++    },
++    "duet_admin_attestation_service_url": "https://sharedneu.neu.attest.azure.net",
++    "duet_service_result": {
++        "service_info": {
++            "service_code_hash": "b853d36744e9ca4b7105b25c5e3dd26d91c99f166bce1ed8264bbf77eaefe683",
++            "service_dependencies_hash": "06e8368f5451b021c83ac2b41ceac201a5bcdba3193377d84a7c0b0ffffb1e29",
++            "service_location": {
++                "6423a8f7dbc60f3d970acdefa71dc4f0415ac868697fb377c0ce0dd768a167ad": {
++                    "cloud_provider_metadata_result": {
++                        "azEnvironment": "AzurePublicCloud",
++                        "location": "westeurope"
++                    },
++                    "geoip_api_lookup_result": {
++                        "http://ip-api.com/json/": {
++                            "city": "Amsterdam",
++                            "country": "Netherlands",
++                            "countryCode": "NL",
++                            "lat": 52.3667,
++                            "lon": 4.9
++                        },
++                        "https://api.ipwho.org/ip/": {},
++                        "https://apip.cc/json": {
++                            "City": "Amsterdam",
++                            "CountryCode": "NL",
++                            "CountryName": "The Netherlands",
++                            "Latitude": "52.3759",
++                            "Longitude": "4.8975"
++                        },
++                        "https://free.freeipapi.com/api/json/": {
++                            "cityName": "Amsterdam",
++                            "countryCode": "NL",
++                            "countryName": "The Netherlands",
++                            "latitude": 52.3676,
++                            "longitude": 4.90414
++                        },
++                        "https://geoapi.info/api/geo": {},
++                        "https://ipinfo.io/": {
++                            "city": "Amsterdam",
++                            "country": "NL",
++                            "loc": "52.3740,4.8897"
++                        },
++                        "https://reallyfreegeoip.org/json/": {
++                            "city": "Amsterdam",
++                            "country_code": "NL",
++                            "country_name": "The Netherlands",
++                            "latitude": 52.3759,
++                            "longitude": 4.8975
++                        }
++                    },
++                    "rtt_based_estimation_result": {
++                        "closest_areas_rtt_ms": {
++                            "Alphen Aan Den Rijn, NL": 3.077,
++                            "Amsterdam, NL": 0.924,
++                            "Arnhem, NL": 4.558,
++                            "Capelle Aan Den Ijssel, NL": 3.461,
++                            "Delft, NL": 2.712,
++                            "Dronten, NL": 2.116,
++                            "Duesseldorf, DE": 4.095,
++                            "Dusseldorf, DE": 4.006,
++                            "Ede, NL": 2.471,
++                            "Haarlem, NL": 1.609,
++                            "Harderwijk, NL": 3.516,
++                            "Hoofddorp, NL": 1.391,
++                            "Meppel, NL": 3.54,
++                            "Rotterdam, NL": 2.057,
++                            "Schiphol Rijk, NL": 1.834,
++                            "Steenbergen, NL": 5.167,
++                            "The Hague, NL": 2.77,
++                            "Utrecht, NL": 2.173,
++                            "Veendam, NL": 4.378,
++                            "Zaventem, BE": 4.891
++                        },
++                        "estimated_coordinates": {
++                            "latitude": 52.22671871201438,
++                            "longitude": 4.9838660105135135
++                        },
++                        "estimated_possible_countries": {
++                            "BE": 0.010135232050181674,
++                            "DE": 0.029566437866833068,
++                            "NL": 0.9602983300829852
++                        },
++                        "reverse_geocode_lookup": {
++                            "https://api.bigdatacloud.net/data/reverse-geocode-client": {
++                                "city": "Gemeente De Ronde Venen",
++                                "countryCode": "NL",
++                                "countryName": "Netherlands (Kingdom of the)"
++                            }
++                        }
++                    },
++                    "service_owner_config_result": "westeurope"
++                }
++            },
++            "service_tools_hashes": {
++                "build_tools.py": "95fb3d065af5c8c1b25e0cb22a76c193cafe57158c7eee85849bc1c94bf8f4ab",
++                "huggingface": "86e3b11ab5475b83ada1f34cae1089aff14eb236e3814fbb42228d517a5c8bb9"
++            }
++        },
++        "service_result": {
++            "certificates": {},
++            "hashes": {
++                "code": {
++                    "code.tar": "fff452eb81453c7be10b69c614b92c5e188848f34c8598f40e575d10c111b027"
++                },
++                "code_build_args": {},
++                "inputs": {},
++                "outputs": {
++                    "linux-headers-6.8.4-rt11-raspi_6.8.4-g75867ff0890f-1_arm64.deb": "44847677ef4ac5ca6a969c4a01e6916c1ee16e229db1bd94425fd0b07b83fc55",
++                    "linux-image-6.8.4-rt11-raspi_6.8.4-g75867ff0890f-1_arm64.deb": "3be2867dc5c37d5f0d95366b953c0ac09d57c421b4c2431753640a6b8e3fd69a",
++                    "linux-libc-dev_6.8.4-g75867ff0890f-1_arm64.deb": "bb0f36344856b78e0b2ff04c67fd4b7d0e6a8a80d482b919a8cb870c73e0e972"
++                }
++            },
++            "power_usage": {
++                "codecarbon": {
++                    "01_uploads": 1.0348831963211275e-05,
++                    "02_preparing_downloading_files": 1.0346642506534456e-05,
++                    "03_preparing_computing_hashes": 1.0347302224132133e-05,
++                    "04_preparing_building_container_image": 0.06753007866698402,
++                    "05_running": 3.928843372484311e-05,
++                    "99_total_power_usage_KWh": 0.06760040987740275
++                }
++            },
++            "timestamp": 1774289172.8759155
++        }
++    },
++    "duet_admin_signature": "WwlI5c+3z+A8bgylXG+grcuba6mc2o38CnSeTaFDPucq5ESmZpAsUtk8urBJB+iy085j3OYiKdhRDJYovNSZ2rm7/ZtTaiSXq8iNj5NwsTR5kNv/5JTTEwpaXXJvZ1yOgWLGjEiSyXa2BSDYUJTNFL3mcncuUFOFxo4rSJlDrZVxEzxkmOqMI2FutFXFcbI1K9zp3OkegCxLY1B2XLjsyLOmtXaeZloq7h/JymYP4V5WcSZHkyBaiqz3p8+ar4nPOsAom8fQaKBsdltHXM2gYE73+bAso2Fjom4KdHnPybIo4EcPbS5zpaxW+ZlgFzl8IlQS7VSBs5NSjZzeSN143UcoyuRMozltW973Ob2CVgc4xUKl6EqVSTr1SnUGA+Ri6jiZscsKNEVFUSo09Ftw81LHDwfHzgRZAyGfGRzSBX50IfxIcQQ1y5wXntXDSyjUydZ0SGue+/aneJISYoBQuKyA/iMSr2Eno2emDDk/bucCJGCUSmoZOTFSQ+kg+NZB8No5HGyIV8KTYw/sCW3Y9VSyJbCtrBrvasx7qW5+MQKZL4NV1Ctuyg+gdcqXyF8AmD6wg7C75RSHargdP0XFJQzQ6fs0NVIitt3PNQ+Tmb8Mrav2NohMEJxnls8htI3BeYxJ4C+hUaCCbBFpUgldCtua8K4I7Oc5qK6387as800="
++}
+diff --git a/src/certification-verification/simulate-azure.py b/src/certification-verification/simulate-azure.py
+new file mode 100755
+index 0000000000000000000000000000000000000000..e06c24257bc1a886fa73646aa7aec89ba5898755
+--- /dev/null
++++ b/src/certification-verification/simulate-azure.py
+@@ -0,0 +1,159 @@
++#!/usr/bin/env python3
++"""Local stand-in for Azure login, SGX attest, and the /certs JWKS.
++
++The verifier talks to it only when CACTEE_AZURE_SIMULATE=1.
++Certificates cannot enable that switch.
++"""
++
++import base64
++import hashlib
++import json
++import subprocess
++import time
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++from pathlib import Path
++
++ROOT = Path("/tmp/cactee-sim")
++HOST = "127.0.0.1"
++PORT = 8443
++ENDPOINT = f"https://{HOST}:{PORT}"
++KID = "sim"
++
++
++def b64url(data: bytes) -> str:
++    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
++
++
++def openssl(*args: str, input_bytes: bytes | None = None) -> bytes:
++    result = subprocess.run(
++        ["openssl", *args],
++        input=input_bytes,
++        check=True,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++    )
++    return result.stdout
++
++
++def prepare() -> None:
++    ROOT.mkdir(parents=True, exist_ok=True)
++    key = ROOT / "key.pem"
++    cert = ROOT / "cert.pem"
++    if not key.exists() or not cert.exists():
++        openssl(
++            "req", "-x509", "-newkey", "rsa:2048",
++            "-keyout", str(key), "-out", str(cert),
++            "-days", "1", "-nodes",
++            "-subj", "/CN=127.0.0.1",
++            "-addext", "subjectAltName=IP:127.0.0.1",
++        )
++
++    modulus = openssl("rsa", "-in", str(key), "-noout", "-modulus").decode()
++    hex_n = modulus.strip().split("=", 1)[1]
++    n = b64url(bytes.fromhex(hex_n))
++    (ROOT / "jwks.json").write_text(json.dumps({
++        "keys": [{"kty": "RSA", "use": "sig", "alg": "RS256", "kid": KID, "n": n, "e": "AQAB"}]
++    }))
++
++    pem = "simulation-public-key\n"
++    mrenclave = "11" * 32
++    quote = bytearray(432)
++    quote[112:144] = bytes.fromhex(mrenclave)
++    quote[368:400] = hashlib.sha256(pem.encode()).digest()
++
++    out = ROOT / "out"
++    out.mkdir(exist_ok=True)
++    payload = b"hello\n"
++    (out / "hello").write_bytes(payload)
++
++    (ROOT / "manifest.json").write_text(json.dumps({
++        "EXPECTED_DUET_ADMIN_MRENCLAVE": mrenclave,
++        "EXPECTED_DUET_SERVICE_INFO": {
++            "service_code_hash": "code",
++            "service_tools_hashes": {"tool": "hash"},
++            "service_dependencies_hash": {"cpu": "dep"},
++        },
++    }, indent=2) + "\n")
++    (ROOT / "certificate.json").write_text(json.dumps({
++        "duet_admin_attestation_service_url": ENDPOINT,
++        "duet_admin_quote": {
++            "quote": base64.b64encode(quote).decode(),
++            "public_key": pem,
++        },
++        "duet_admin_signature": base64.b64encode(b"not-a-signature").decode(),
++        "duet_service_result": {
++            "service_info": {
++                "service_code_hash": "code",
++                "service_tools_hashes": {"tool": "hash"},
++                "service_dependencies_hash": "dep",
++            },
++            "service_result": {
++                "hashes": {"outputs": {"hello": hashlib.sha256(payload).hexdigest()}},
++            },
++        },
++    }, indent=2) + "\n")
++
++
++def sign_jwt() -> str:
++    header = b64url(json.dumps({"alg": "RS256", "kid": KID}, separators=(",", ":")).encode())
++    payload = b64url(json.dumps({
++        "iss": ENDPOINT,
++        "exp": int(time.time()) + 3600,
++    }, separators=(",", ":")).encode())
++    signing_input = f"{header}.{payload}".encode()
++    signature = openssl("dgst", "-sha256", "-sign", str(ROOT / "key.pem"), input_bytes=signing_input)
++    return f"{header}.{payload}.{b64url(signature)}"
++
++
++class Handler(BaseHTTPRequestHandler):
++    def do_POST(self) -> None:
++        length = int(self.headers.get("Content-Length", "0"))
++        self.rfile.read(length)
++        if self.path.endswith("/oauth2/v2.0/token"):
++            body = b'{"access_token":"sim-token","token_type":"Bearer"}'
++        elif self.path.split("?", 1)[0] == "/attest/SgxEnclave":
++            if not (self.headers.get("Authorization") or "").startswith("Bearer "):
++                self.send_response(401)
++                self.end_headers()
++                return
++            body = json.dumps({"token": sign_jwt()}).encode()
++        else:
++            self.send_response(404)
++            self.end_headers()
++            return
++        self.send_response(200)
++        self.send_header("Content-Type", "application/json")
++        self.send_header("Content-Length", str(len(body)))
++        self.end_headers()
++        self.wfile.write(body)
++
++    def do_GET(self) -> None:
++        if self.path.split("?", 1)[0] != "/certs":
++            self.send_response(404)
++            self.end_headers()
++            return
++        body = (ROOT / "jwks.json").read_bytes()
++        self.send_response(200)
++        self.send_header("Content-Type", "application/json")
++        self.send_header("Content-Length", str(len(body)))
++        self.end_headers()
++        self.wfile.write(body)
++
++    def log_message(self, fmt: str, *args) -> None:
++        print(f"{self.command} {self.path} -> {args[1] if len(args) > 1 else ''}")
++
++
++def main() -> None:
++    prepare()
++    print(f"simulated azure at {ENDPOINT}", flush=True)
++    print(f"trust this cert: {ROOT / 'cert.pem'}", flush=True)
++    print(f"certificate: {ROOT / 'certificate.json'}", flush=True)
++    server = ThreadingHTTPServer((HOST, PORT), Handler)
++    ctx = __import__("ssl").SSLContext(__import__("ssl").PROTOCOL_TLS_SERVER)
++    ctx.load_cert_chain(ROOT / "cert.pem", ROOT / "key.pem")
++    server.socket = ctx.wrap_socket(server.socket, server_side=True)
++    server.serve_forever()
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/src/certification-verification/smoke-test.cc b/src/certification-verification/smoke-test.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..7682a9a811fd0fe7c108dd36d2f9cbd3d4026180
+--- /dev/null
++++ b/src/certification-verification/smoke-test.cc
+@@ -0,0 +1,61 @@
++#include "certificate-verifier.hh"
++
++#include <iostream>
++#include <stdexcept>
++
++int main()
++{
++    nlohmann::json manifest = {
++        {"EXPECTED_DUET_ADMIN_MRENCLAVE", "ab"},
++        {"EXPECTED_DUET_SERVICE_INFO",
++         {{"service_code_hash", "code"},
++          {"service_tools_hashes", {{"tool", "hash"}}},
++          {"service_dependencies_hash", {{"cpu", "dep"}}}}},
++    };
++
++    bool threw = false;
++    try {
++        certificate_verifier::CertificateVerifier(std::filesystem::path{}, nlohmann::json::object());
++    } catch (const std::invalid_argument &) {
++        threw = true;
++    }
++    if (!threw) {
++        std::cerr << "manifest without the two keys was accepted\n";
++        return 1;
++    }
++
++    certificate_verifier::CertificateVerifier verifier(std::filesystem::path{}, manifest);
++
++    auto rejected = verifier.verifyCertificate(nlohmann::json::object(), "other");
++    if (rejected)
++        return 1;
++
++    nlohmann::json certificate = {
++        {"duet_admin_quote", {{"quote", "YQ=="}, {"public_key", "not-a-key"}}},
++        {"duet_admin_signature", "YQ=="},
++        {"duet_service_result",
++         {{"service_info",
++           {{"service_code_hash", "nope"},
++            {"service_tools_hashes", nlohmann::json::object()},
++            {"service_dependencies_hash", "nope"}}}}},
++    };
++
++    auto report = verifier.verifyCertificate(certificate, "azure");
++    if (!report) {
++        std::cerr << report.error() << "\n";
++        return 1;
++    }
++    if (report->ok) {
++        std::cerr << "report was accepted\n";
++        return 1;
++    }
++    if (report->steps.size() != 4) {
++        std::cerr << "expected 4 steps, got " << report->steps.size() << "\n";
++        return 1;
++    }
++
++    std::cout << "smoke ok\n";
++    for (const auto & step : report->steps)
++        std::cout << step.name << (step.ok ? " ok" : " fail") << "\n" << step.detail << "\n";
++    return 0;
++}
+diff --git a/src/certification-verification/smoke.sh b/src/certification-verification/smoke.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..96599f5f85e302af207255c019c0e9700f0812a0
+--- /dev/null
++++ b/src/certification-verification/smoke.sh
+@@ -0,0 +1,10 @@
++#!/usr/bin/env bash
++set -euo pipefail
++cd "$(dirname "$0")/../.."
++# Stock Nix 2.35 does not know attestation-* settings. Use the fork build.
++FORK=/home/harmoniatest/nix/outputs/out
++export PATH="$FORK/bin:$PATH"
++export LD_LIBRARY_PATH="$FORK/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
++# bash -c keeps the nix shell environment. bash -lc would drop PKG_CONFIG_PATH.
++nix shell nixpkgs#gcc nixpkgs#pkg-config nixpkgs#openssl.dev nixpkgs#nlohmann_json nixpkgs#curl.dev --command \
++  bash -c 'g++ -std=c++23 -Isrc/certification-verification/Include $(pkg-config --cflags openssl nlohmann_json libcurl) src/certification-verification/certificate-verifier.cc src/certification-verification/smoke-test.cc -o /tmp/cactee-smoke $(pkg-config --libs openssl libcurl) && /tmp/cactee-smoke'
+diff --git a/src/certification-verification/which-nix.sh b/src/certification-verification/which-nix.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..fa3e93930e5bef983e427698ca789d0817596219
+--- /dev/null
++++ b/src/certification-verification/which-nix.sh
+@@ -0,0 +1,15 @@
++#!/usr/bin/env bash
++set -euo pipefail
++echo "USER=$(id -un) HOME=$HOME"
++for d in \
++  /home/aetisam/nix-prefix/bin/nix \
++  /home/aetisam/nix/outputs/out/bin/nix \
++  /home/aetisam/nixfresh/nix/outputs/out/bin/nix \
++  /home/harmoniatest/nix/outputs/out/bin/nix
++do
++  if [[ -x "$d" ]]; then
++    echo "FOUND $d"
++  else
++    echo "MISSING $d"
++  fi
++done
+diff --git a/src/libstore/attestation.cc b/src/libstore/attestation.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5a002a73fd28fae81eb058fbf4a9567bf30dbf2
+--- /dev/null
++++ b/src/libstore/attestation.cc
+@@ -0,0 +1,557 @@
++#include "nix/store/attestation.hh"
++
++#include "nix/store/binary-cache-store.hh"
++#include "nix/store/local-fs-store.hh"
++#include "nix/store/build-result.hh"
++#include "nix/store/globals.hh"
++#include "nix/util/file-system.hh"
++#include "nix/util/hash.hh"
++#include "nix/util/logging.hh"
++#include "nix/util/strings.hh"
++
++#include "../certification-verification/Include/certificate-verifier.hh"
++
++#include <nlohmann/json.hpp>
++
++#include <algorithm>
++#include <optional>
++#include <stdexcept>
++#include <vector>
++
++namespace nix {
++
++static std::string sriFileStem(const std::string & narHashSri)
++{
++    std::string s = narHashSri;
++    std::replace(s.begin(), s.end(), '/', '_');
++    return s;
++}
++
++static std::optional<std::pair<std::string, std::string>>
++readLocalAttestationSidecar(Store & srcStore, const StorePath & path);
++
++static void verifyInputCertificate(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & inputPath,
++    const std::string & narHashSri,
++    const std::list<ref<Store>> & substituters);
++
++std::filesystem::path attestationCertPath(const AttestationSettings & settings, const std::string & narHashSri)
++{
++    return std::filesystem::path(settings.attestationStore.get()) / (sriFileStem(narHashSri) + ".json");
++}
++
++static bool isCacteeCertificate(const nlohmann::json & cert)
++{
++    return cert.contains("duet_admin_quote") || cert.contains("duet_service_result");
++}
++
++static std::string sha256HexOfNar(Store & store, const StorePath & path)
++{
++    HashSink sink(HashAlgorithm::SHA256);
++    store.narFromPath(path, sink);
++    return sink.finish().hash.to_string(HashFormat::Base16, false);
++}
++
++/* Certificate key is the store path with "/nix/store/" removed, plus ".nar". */
++static std::string narFileName(const StorePath & path)
++{
++    return std::string(path.hashPart()) + "-" + std::string(path.name()) + ".nar";
++}
++
++static void logNarHashCheck(
++    const StorePath & path,
++    const nlohmann::json & cert,
++    const std::string & narHashHex,
++    bool hashedBytes)
++{
++    auto narFile = narFileName(path);
++    auto stripped = narFile.substr(0, narFile.size() - 4);
++    notice("attestation: store path without /nix/store/: %s", stripped);
++    if (hashedBytes)
++        notice("attestation: sha256sum of retrieved NAR %s is %s", narFile, narHashHex);
++    else
++        notice(
++            "attestation: NAR %s is not retrieved yet; narinfo sha256 is %s",
++            narFile,
++            narHashHex);
++
++    std::string certHash;
++    try {
++        const auto & outputs = cert.at("duet_service_result").at("service_result").at("hashes").at("outputs");
++        if (outputs.contains(narFile) && outputs.at(narFile).is_string())
++            certHash = outputs.at(narFile).get<std::string>();
++    } catch (const nlohmann::json::exception &) {
++    }
++    if (certHash.empty())
++        notice("attestation: certificate has no sha256 for %s", narFile);
++    else
++        notice(
++            "attestation: certificate %s sha256 is %s (%s)",
++            narFile,
++            certHash,
++            certHash == narHashHex ? "match" : "mismatch");
++}
++
++static void verifyCacteeCertificate(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & path,
++    const nlohmann::json & cert,
++    const std::string & claimedNarHashHex)
++{
++    auto manifestPath = settings.attestationCacteeManifest.get();
++    if (manifestPath.empty())
++        throw Error(
++            "refusing '%s': CACTEE certificate requires attestation-cactee-manifest "
++            "(EXPECTED_DUET_ADMIN_MRENCLAVE and EXPECTED_DUET_SERVICE_INFO)",
++            store.printStorePath(path));
++
++    /* Code, inputs, and build args are not on the client. The output is
++       this NAR's store path, and only after the path is in the store. */
++    std::filesystem::path outputFolder;
++    std::string narHashHex = claimedNarHashHex;
++    if (store.isValidPath(path)) {
++        if (auto * local = dynamic_cast<LocalFSStore *>(&store))
++            outputFolder = local->toRealPath(path);
++        /* Path is already in the store, or the download just finished.
++           Hash the NAR bytes again and compare that digest. */
++        narHashHex = sha256HexOfNar(store, path);
++    }
++    logNarHashCheck(path, cert, narHashHex, store.isValidPath(path));
++
++    std::expected<certificate_verifier::VerificationResult, std::string> report;
++    try {
++        nlohmann::json manifest = nlohmann::json::parse(readFile(manifestPath));
++        certificate_verifier::CertificateVerifier verifier(outputFolder, std::move(manifest), narHashHex);
++        report = verifier.verifyCertificate(cert, "azure");
++    } catch (const std::exception & e) {
++        throw Error("CACTEE certificate for '%s': %s", store.printStorePath(path), e.what());
++    }
++    if (!report)
++        throw Error("CACTEE certificate for '%s': %s", store.printStorePath(path), report.error());
++
++    for (auto & step : report->steps) {
++        auto detail = step.detail;
++        for (char & c : detail)
++            if (c == '\n')
++                c = ' ';
++        notice(
++            "attestation: %s %s%s%s",
++            step.name,
++            step.ok ? "ok" : "fail",
++            detail.empty() ? "" : " — ",
++            detail.c_str());
++    }
++
++    if (report->ok)
++        return;
++
++    std::string details;
++    for (auto & step : report->steps) {
++        details += step.name;
++        details += step.ok ? " ok\n" : " fail\n";
++        if (!step.detail.empty())
++            details += step.detail + "\n";
++    }
++    throw Error(
++        "refusing '%s': CACTEE certificate verification failed\n%s",
++        store.printStorePath(path),
++        details);
++}
++
++static void tryFetchFileFromSubstituters(
++    const std::list<ref<Store>> & substituters, const std::vector<std::string> & names, const std::filesystem::path & dest)
++{
++    for (auto & sub : substituters) {
++        auto * cache = dynamic_cast<BinaryCacheStore *>(&*sub);
++        if (!cache)
++            continue;
++        for (auto & name : names) {
++            try {
++                auto data = cache->getFile(name);
++                if (!data)
++                    continue;
++                std::filesystem::create_directories(dest.parent_path());
++                writeFile(dest, *data);
++                notice(
++                    "attestation: fetched '%s' from substituter '%s' -> %s",
++                    name,
++                    cache->config.getHumanReadableURI(),
++                    dest.string());
++                return;
++            } catch (Error &) {
++                continue;
++            }
++        }
++    }
++}
++
++static void tryFetchCertFromSubstituters(
++    const std::list<ref<Store>> & substituters,
++    const StorePath & inputPath,
++    const std::string & narHashSri,
++    const std::filesystem::path & dest)
++{
++    auto hashPart = std::string(inputPath.hashPart());
++    auto stem = sriFileStem(narHashSri);
++    tryFetchFileFromSubstituters(
++        substituters,
++        {
++            hashPart + ".attestation.json",
++            stem + ".json",
++            stem + "_asset_certificate.json",
++        },
++        dest);
++}
++
++static std::optional<std::pair<std::string, std::string>> fetchSidecarFromBinaryCache(
++    BinaryCacheStore & cache, const StorePath & path, const std::string & narHashSri)
++{
++    auto hashPart = std::string(path.hashPart());
++    auto stem = sriFileStem(narHashSri);
++    std::optional<std::string> json;
++    for (auto & name : {
++             hashPart + ".attestation.json",
++             stem + ".json",
++             stem + "_asset_certificate.json",
++         }) {
++        json = cache.getFile(name);
++        if (json) {
++            notice(
++                "attestation: fetched '%s' from substituter '%s'",
++                name,
++                cache.config.getHumanReadableURI());
++            break;
++        }
++    }
++    if (!json)
++        return std::nullopt;
++    return std::make_pair(std::move(*json), std::string{});
++}
++
++static std::shared_ptr<const ValidPathInfo> pathInfoFromStoreOrSubstituters(
++    Store & store, const StorePath & inputPath, const std::list<ref<Store>> & substituters)
++{
++    if (store.isValidPath(inputPath))
++        return store.queryPathInfo(inputPath).get_ptr();
++
++    for (auto & sub : substituters) {
++        try {
++            return sub->queryPathInfo(inputPath).get_ptr();
++        } catch (InvalidPath &) {
++            continue;
++        } catch (Error &) {
++            continue;
++        }
++    }
++    return nullptr;
++}
++
++static void walkNarinfoClosureAttestations(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & path,
++    const std::list<ref<Store>> & substituters,
++    StorePathSet & visiting,
++    StorePathSet & done)
++{
++    if (done.count(path))
++        return;
++    if (store.isValidPath(path)) {
++        done.insert(path);
++        return;
++    }
++    if (visiting.count(path))
++        return;
++
++    auto info = pathInfoFromStoreOrSubstituters(store, path, substituters);
++    if (!info) {
++        /* Not in the store and not on a cache — will be built later. */
++        done.insert(path);
++        return;
++    }
++
++    visiting.insert(path);
++    for (auto & ref : info->references)
++        if (ref != path)
++            walkNarinfoClosureAttestations(store, settings, ref, substituters, visiting, done);
++    visiting.erase(path);
++
++    auto narHashSri = info->narHash.to_string(HashFormat::SRI, true);
++    verifyInputCertificate(store, settings, path, narHashSri, substituters);
++    done.insert(path);
++}
++
++void verifyPathClosureAttestations(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & root,
++    const std::list<ref<Store>> & substituters,
++    StorePathSet & alreadyVerified)
++{
++    /* The certifying container sets require-attestation = false. Certificate
++       checks run on the client, which has the cert volume and the manifest. */
++    if (!settings.requireAttestation.get())
++        return;
++
++    if (substituters.empty())
++        notice(
++            "attestation: no substituters set (this fork does not use cache.nixos.org); "
++            "set substituters to your Harmonia URL in nix.conf");
++    else {
++        for (auto & sub : substituters)
++            notice("attestation: substituter '%s'", sub->config.getHumanReadableURI());
++    }
++
++    auto before = alreadyVerified.size();
++    StorePathSet visiting;
++    walkNarinfoClosureAttestations(store, settings, root, substituters, visiting, alreadyVerified);
++    auto n = alreadyVerified.size() - before;
++    if (n > 0)
++        notice(
++            "attestation: preflight done — %d store path(s), leaves-first JSON certificates verified "
++            "before NAR download or build",
++            n);
++}
++
++static void verifyInputCertificate(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & inputPath,
++    const std::string & narHashSri,
++    const std::list<ref<Store>> & substituters)
++{
++    if (settings.attestationBootstrapInputs.get().count(narHashSri)) {
++        notice(
++            "attestation: skip JSON certificate for bootstrap '%s' (narHash %s)",
++            store.printStorePath(inputPath),
++            narHashSri);
++        return;
++    }
++
++    auto certPath = attestationCertPath(settings, narHashSri);
++    /* Harmonia keeps the published JSON as <store-hash>.json in this directory. */
++    auto sharedCert = std::filesystem::path("/var/lib/nix-certification")
++        / (std::string(inputPath.hashPart()) + ".json");
++    if (!std::filesystem::exists(certPath) && std::filesystem::exists(sharedCert)) {
++        std::filesystem::create_directories(certPath.parent_path());
++        std::filesystem::copy_file(
++            sharedCert, certPath, std::filesystem::copy_options::overwrite_existing);
++        notice(
++            "attestation: read certificate for '%s' from Harmonia directory %s",
++            store.printStorePath(inputPath),
++            sharedCert.string());
++    }
++    tryFetchCertFromSubstituters(substituters, inputPath, narHashSri, certPath);
++
++    if (!std::filesystem::exists(certPath))
++        throw BuildError(
++            BuildResult::Failure::InputRejected,
++            "input '%s' (NAR hash %s) has no attestation certificate at '%s' "
++            "(and none was found on substituters as %s.attestation.json)",
++            store.printStorePath(inputPath),
++            narHashSri,
++            certPath.string(),
++            std::string(inputPath.hashPart()));
++
++    auto certJson = nlohmann::json::parse(readFile(certPath));
++    if (!isCacteeCertificate(certJson))
++        throw BuildError(
++            BuildResult::Failure::InputRejected,
++            "certificate for '%s' is not a CACTEE asset certificate",
++            store.printStorePath(inputPath));
++    verifyCacteeCertificate(
++        store, settings, inputPath, certJson, Hash::parseSRI(narHashSri).to_string(HashFormat::Base16, false));
++    notice(
++        "attestation: JSON certificate verified for '%s' (narHash %s)",
++        store.printStorePath(inputPath),
++        narHashSri);
++}
++
++void verifyPathAttestation(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & path,
++    const std::string & narHashSri,
++    const std::list<ref<Store>> & substituters)
++{
++    if (!settings.requireAttestation.get())
++        return;
++    verifyInputCertificate(store, settings, path, narHashSri, substituters);
++}
++
++void verifyDirectInputAttestations(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & drvPath,
++    const BasicDerivation & drv,
++    const std::list<ref<Store>> & substituters,
++    StorePathSet * alreadyVerified)
++{
++    if (!settings.requireAttestation.get())
++        return;
++
++    debug("preflight attestation closure for '%s'", store.printStorePath(drvPath));
++
++    StorePathSet localDone;
++    StorePathSet & done = alreadyVerified ? *alreadyVerified : localDone;
++
++    for (auto & inputPath : drv.inputs)
++        verifyPathClosureAttestations(store, settings, inputPath, substituters, done);
++}
++
++void installAttestationSidecar(
++    Store & store, const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig)
++{
++    /* Client cache only. Do not write a Harmonia drop directory or a .sig. */
++    (void) store;
++    (void) path;
++    (void) sig;
++    auto narHashSri = narHash.to_string(HashFormat::SRI, true);
++    auto dest = attestationCertPath(settings.getAttestationSettings(), narHashSri);
++    std::filesystem::create_directories(dest.parent_path());
++    writeFile(dest, json);
++}
++
++void verifyIncomingAttestation(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & path,
++    const Hash & narHash,
++    std::string_view json,
++    std::string_view sig)
++{
++    (void) sig;
++    auto narHashSri = narHash.to_string(HashFormat::SRI, true);
++    if (settings.attestationBootstrapInputs.get().count(narHashSri))
++        return;
++
++    auto certJson = nlohmann::json::parse(std::string{json});
++    if (!isCacteeCertificate(certJson))
++        throw Error(
++            "certificate for '%s' is not a CACTEE asset certificate",
++            store.printStorePath(path));
++    verifyCacteeCertificate(
++        store, settings, path, certJson, narHash.to_string(HashFormat::Base16, false));
++}
++
++void requireIncomingAttestationSidecar(
++    Store & store, const AttestationSettings & settings, const StorePath & path, const Hash & narHash)
++{
++    auto narHashSri = narHash.to_string(HashFormat::SRI, true);
++    if (settings.attestationBootstrapInputs.get().count(narHashSri))
++        return;
++
++    auto sidecar = readLocalAttestationSidecar(store, path);
++    if (!sidecar)
++        throw Error(
++            "refusing to import '%s' (NAR hash %s): no {hashPart}.attestation.json "
++            "was received (or verified) before the NAR",
++            store.printStorePath(path),
++            narHashSri);
++
++    verifyIncomingAttestation(store, settings, path, narHash, sidecar->first, sidecar->second);
++}
++
++void copyAttestationSidecar(Store & srcStore, Store & dstStore, const StorePath & path)
++{
++    if (&srcStore == &dstStore)
++        return;
++
++    auto & att = settings.getAttestationSettings();
++    Hash narHash = srcStore.queryPathInfo(path)->narHash;
++    auto narHashSri = narHash.to_string(HashFormat::SRI, true);
++    bool bootstrap = att.attestationBootstrapInputs.get().count(narHashSri);
++    auto sidecar = std::optional<std::pair<std::string, std::string>>{};
++    /* HTTP: GET {hashPart}.attestation.json; do not reuse a shared NAR-hash SRI file. */
++    if (auto * cache = dynamic_cast<BinaryCacheStore *>(&srcStore))
++        sidecar = fetchSidecarFromBinaryCache(*cache, path, narHashSri);
++    if (!sidecar)
++        sidecar = readLocalAttestationSidecar(srcStore, path);
++    if (!sidecar) {
++        auto sharedCert = std::filesystem::path("/var/lib/nix-certification")
++            / (std::string(path.hashPart()) + ".json");
++        if (std::filesystem::exists(sharedCert)) {
++            notice(
++                "attestation: read certificate for '%s' from Harmonia directory %s",
++                srcStore.printStorePath(path),
++                sharedCert.string());
++            sidecar = std::make_pair(readFile(sharedCert), std::string{});
++        }
++    }
++
++    bool haveJson = sidecar && !sidecar->first.empty();
++
++    if (!haveJson) {
++        if (bootstrap || !att.requireAttestation.get())
++            return;
++        throw Error(
++            "refusing to copy '%s': no CACTEE certificate for this path on '%s'",
++            srcStore.printStorePath(path),
++            srcStore.config.getHumanReadableURI());
++    }
++
++    verifyIncomingAttestation(dstStore, att, path, narHash, sidecar->first, sidecar->second);
++    auto dest = attestationCertPath(att, narHashSri);
++    std::filesystem::create_directories(dest.parent_path());
++    writeFile(dest, sidecar->first);
++}
++
++static std::optional<std::pair<std::string, std::string>>
++readLocalAttestationSidecar(Store & srcStore, const StorePath & path)
++{
++    auto & attSettings = settings.getAttestationSettings();
++    auto hashPart = std::string(path.hashPart());
++    auto storeDir = std::filesystem::path(attSettings.attestationStore.get());
++
++    std::vector<std::filesystem::path> jsonCandidates;
++    jsonCandidates.push_back(storeDir / (hashPart + ".attestation.json"));
++
++    std::filesystem::path jsonPath;
++    for (auto & p : jsonCandidates) {
++        if (std::filesystem::exists(p)) {
++            jsonPath = p;
++            break;
++        }
++    }
++    if (jsonPath.empty())
++        return std::nullopt;
++
++    auto json = readFile(jsonPath);
++    auto jsonName = jsonPath.filename().string();
++    std::vector<std::filesystem::path> sigCandidates;
++    if (jsonName.ends_with(".attestation.json"))
++        sigCandidates.push_back(jsonPath.parent_path() / (hashPart + ".attestation.sig"));
++    sigCandidates.push_back(std::filesystem::path(jsonPath.string() + ".sig"));
++
++    std::string sig;
++    for (auto & p : sigCandidates) {
++        if (std::filesystem::exists(p)) {
++            sig = readFile(p);
++            break;
++        }
++    }
++    return std::make_pair(std::move(json), std::move(sig));
++}
++
++void bindAttestationSidecarFromDisk(Store & store, const StorePath & path, const Hash & narHash)
++{
++    auto sidecar = readLocalAttestationSidecar(store, path);
++    auto & att = settings.getAttestationSettings();
++    auto narHashSri = narHash.to_string(HashFormat::SRI, true);
++    if (!sidecar) {
++        if (att.requireAttestation.get() && !att.attestationBootstrapInputs.get().count(narHashSri))
++            throw Error(
++                "cannot bind attestation for '%s' (NAR hash %s): no CACTEE certificate "
++                "in attestation-store",
++                store.printStorePath(path),
++                narHashSri);
++        return;
++    }
++    verifyIncomingAttestation(store, att, path, narHash, sidecar->first, sidecar->second);
++    installAttestationSidecar(store, path, narHash, sidecar->first, sidecar->second);
++}
++
++} // namespace nix
+diff --git a/src/libstore/binary-cache-store.cc b/src/libstore/binary-cache-store.cc
+index 067e24a0f879cedb824beb5656f3675ddae7d335..6e7971a5b0ef520046edcb31632886a701b5af29 100644
+--- a/src/libstore/binary-cache-store.cc
++++ b/src/libstore/binary-cache-store.cc
+@@ -1,5 +1,7 @@
+ #include "nix/util/archive.hh"
+ #include "nix/store/binary-cache-store.hh"
++#include "nix/store/attestation.hh"
++#include "nix/store/globals.hh"
+ #include "nix/util/compression.hh"
+ #include "nix/store/derivations.hh"
+ #include "nix/util/source-accessor.hh"
+@@ -90,6 +92,13 @@ void BinaryCacheStore::upsertFile(
+     upsertFile(path, source, mimeType, sizeHint);
+ }
+ 
++void BinaryCacheStore::addAttestationSidecar(
++    const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig)
++{
++    /* Verify only. This client does not upload the certificate to the cache. */
++    verifyIncomingAttestation(*this, settings.getAttestationSettings(), path, narHash, json, sig);
++}
++
+ void BinaryCacheStore::getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept
+ {
+     try {
+diff --git a/src/libstore/build/derivation-building-goal.cc b/src/libstore/build/derivation-building-goal.cc
+index e336eca67230e9898fcb42b7982d16be6ab0a5cb..7ee311e61c7ae84559d0c5342e2ffef87f95c3e1 100644
+--- a/src/libstore/build/derivation-building-goal.cc
++++ b/src/libstore/build/derivation-building-goal.cc
+@@ -18,6 +18,7 @@
+ #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
+ #include "nix/store/outputs-query.hh"
+ #include "nix/store/globals.hh"
++#include "nix/store/attestation.hh"
+ #include "nix/util/current-process.hh"
+ 
+ #include <chrono>
+diff --git a/src/libstore/build/substitution-goal.cc b/src/libstore/build/substitution-goal.cc
+index 938f521a736c0cceedf9beaf31b83bee230d927f..92cdc53f09b330f3e9418805086823fddec23d94 100644
+--- a/src/libstore/build/substitution-goal.cc
++++ b/src/libstore/build/substitution-goal.cc
+@@ -2,6 +2,8 @@
+ 
+ #include "nix/store/build/worker.hh"
+ #include "nix/store/build/substitution-goal.hh"
++#include "nix/store/attestation.hh"
++#include "nix/store/globals.hh"
+ #include "nix/store/nar-info.hh"
+ #include "nix/store/worker-settings.hh"
+ #include "nix/util/signals.hh"
+diff --git a/src/libstore/cactee-link.cc b/src/libstore/cactee-link.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..8e7dce7cb0ba4990244271eff2a37c33657f4e4b
+--- /dev/null
++++ b/src/libstore/cactee-link.cc
+@@ -0,0 +1,3 @@
++/* Pulls the CACTEE verifier into libstore. Meson only compiles files
++   inside this subproject, so this translation unit includes it. */
++#include "../certification-verification/certificate-verifier.cc"
+diff --git a/src/libstore/globals.cc b/src/libstore/globals.cc
+index 0bbd4b9f09cd67f96ad8470f733226ed9a8d85f9..8b5dd9e2ed46f3cdb6f9a659fe55ca08d52b91dd 100644
+--- a/src/libstore/globals.cc
++++ b/src/libstore/globals.cc
+@@ -51,6 +51,8 @@ void NarInfoDiskCacheSettings::anchor() {}
+ 
+ void LogFileSettings::anchor() {}
+ 
++void AttestationSettings::anchor() {}
++
+ void AutoAllocateUidSettings::anchor() {}
+ 
+ Settings settings;
+diff --git a/src/libstore/include/nix/store/attestation-settings.hh b/src/libstore/include/nix/store/attestation-settings.hh
+new file mode 100644
+index 0000000000000000000000000000000000000000..827983f0a827120590b0f0ec0fe5a13a9b97bac7
+--- /dev/null
++++ b/src/libstore/include/nix/store/attestation-settings.hh
+@@ -0,0 +1,72 @@
++#pragma once
++///@file
++
++#include "nix/util/configuration.hh"
++
++namespace nix {
++
++/**
++ * Client-side CACTEE certificate verification.
++ * Publishing certificates to a cache is not part of this fork.
++ */
++struct AttestationSettings : public virtual Config
++{
++private:
++    void anchor() override;
++
++public:
++    Setting<bool> requireAttestation{
++        this,
++        true,
++        "require-attestation",
++        R"(
++          This fork defaults to true. A substituter NAR is not written
++          to the local store until its CACTEE asset certificate has been
++          fetched and verified against `attestation-cactee-manifest`.
++          The same check runs for direct build inputs. NAR hashes listed
++          in `attestation-bootstrap-inputs` are exempt.
++
++          This option is only settable in the global `nix.conf`, or on
++          the command line by trusted users.
++        )"};
++
++    Setting<std::string> attestationStore{
++        this,
++        "/var/lib/nix-attestations",
++        "attestation-store",
++        R"(
++          Directory where this client keeps fetched CACTEE certificates.
++          Each file is named with the NAR hash SRI, `/` replaced by `_`,
++          plus `.json`. Nix reads `<store-hash>.attestation.json` from a
++          substituter and stores a copy here. It does not publish that
++          file to another cache.
++        )"};
++
++    Setting<StringSet> attestationBootstrapInputs{
++        this,
++        {},
++        "attestation-bootstrap-inputs",
++        R"(
++          Space-separated list of NAR hashes (SRI format) that are trusted
++          without an attestation certificate. Used for bootstrap inputs such
++          as `bootstrap-tools.tar.xz` and `busybox` that cannot be attested
++          because nothing was built before them.
++
++          Example:
++            attestation-bootstrap-inputs = sha256-abc... sha256-def...
++        )"};
++
++    Setting<std::string> attestationCacteeManifest{
++        this,
++        "",
++        "attestation-cactee-manifest",
++        R"(
++          Path to the CACTEE trust file. It holds
++          `EXPECTED_DUET_ADMIN_MRENCLAVE` and `EXPECTED_DUET_SERVICE_INFO`
++          for the duet admin, not for each package. Install it once on
++          the client, the same way as `trusted-public-keys`. Required
++          when a substituter sends a CACTEE asset certificate with a NAR.
++        )"};
++};
++
++} // namespace nix
+diff --git a/src/libstore/include/nix/store/attestation.hh b/src/libstore/include/nix/store/attestation.hh
+new file mode 100644
+index 0000000000000000000000000000000000000000..53e402638ce4ccbec649146af800b23b06bceb92
+--- /dev/null
++++ b/src/libstore/include/nix/store/attestation.hh
+@@ -0,0 +1,64 @@
++#pragma once
++///@file
++
++#include "nix/store/attestation-settings.hh"
++#include "nix/store/derivations.hh"
++#include "nix/store/path.hh"
++#include "nix/store/store-api.hh"
++
++#include <list>
++
++namespace nix {
++
++/** Leaves-first JSON+sig for @a drv inputs and their narinfo closure; no NAR download. */
++void verifyDirectInputAttestations(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & drvPath,
++    const BasicDerivation & drv,
++    const std::list<ref<Store>> & substituters = {},
++    StorePathSet * alreadyVerified = nullptr);
++
++/** Leaves-first JSON+sig for @a root's narinfo graph; skip paths already in the store. */
++void verifyPathClosureAttestations(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & root,
++    const std::list<ref<Store>> & substituters,
++    StorePathSet & alreadyVerified);
++
++/** Verify one path's JSON+sig after narinfo, before the NAR is written. */
++void verifyPathAttestation(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & path,
++    const std::string & narHashSri,
++    const std::list<ref<Store>> & substituters = {});
++
++/** Local SRI-named certificate path (`/` in the hash becomes `_`). */
++std::filesystem::path attestationCertPath(const AttestationSettings & settings, const std::string & narHashSri);
++
++/** Fetch the CACTEE certificate for @a path and verify it. Does not upload it. */
++void copyAttestationSidecar(Store & srcStore, Store & dstStore, const StorePath & path);
++
++/** Bind on-disk `{hashPart}` sidecars to @a path (e.g. `--import-nar`). */
++void bindAttestationSidecarFromDisk(Store & store, const StorePath & path, const Hash & narHash);
++
++/** Verify sidecar JSON+sig; does not write files. */
++void verifyIncomingAttestation(
++    Store & store,
++    const AttestationSettings & settings,
++    const StorePath & path,
++    const Hash & narHash,
++    std::string_view json,
++    std::string_view sig);
++
++/** Require an on-disk sidecar for @a path unless it is a bootstrap NAR hash. */
++void requireIncomingAttestationSidecar(
++    Store & store, const AttestationSettings & settings, const StorePath & path, const Hash & narHash);
++
++/** Save a fetched certificate under `attestation-store` for this client. */
++void installAttestationSidecar(
++    Store & store, const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig);
++
++} // namespace nix
+diff --git a/src/libstore/include/nix/store/binary-cache-store.hh b/src/libstore/include/nix/store/binary-cache-store.hh
+index 7c5ca7948f2002035540a260fc403afa2ad4bd35..5702bd7a5187716f051164452d457b6400ad6a77 100644
+--- a/src/libstore/include/nix/store/binary-cache-store.hh
++++ b/src/libstore/include/nix/store/binary-cache-store.hh
+@@ -254,6 +254,9 @@ public:
+ 
+     void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
+ 
++    void addAttestationSidecar(
++        const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig) override;
++
+     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
+ 
+     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
+diff --git a/src/libstore/include/nix/store/build/worker.hh b/src/libstore/include/nix/store/build/worker.hh
+index f30a3146be4e2279cd0fc76aa02a943dba9fa3ef..606dc9227762736e6fb6c94352affff0b78be7db 100644
+--- a/src/libstore/include/nix/store/build/worker.hh
++++ b/src/libstore/include/nix/store/build/worker.hh
+@@ -245,6 +245,9 @@ public:
+      */
+     fun<std::list<ref<Store>>()> getSubstituters;
+ 
++    /** Paths whose JSON+sig already passed leaves-first preflight in this realise. */
++    StorePathSet attestationPreflightDone;
++
+ #ifndef _WIN32 // TODO Enable building on Windows
+     std::unique_ptr<HookInstance> hook;
+ #endif
+diff --git a/src/libstore/include/nix/store/globals.hh b/src/libstore/include/nix/store/globals.hh
+index 7e9306acb0d1553535d2b21b615642235d767f22..450381758cdc95290edb812c6893145797aee11e 100644
+--- a/src/libstore/include/nix/store/globals.hh
++++ b/src/libstore/include/nix/store/globals.hh
+@@ -10,6 +10,7 @@
+ #include "nix/store/local-settings.hh"
+ #include "nix/store/store-reference.hh"
+ #include "nix/store/worker-settings.hh"
++#include "nix/store/attestation-settings.hh"
+ 
+ #include "nix/store/config.hh"
+ 
+@@ -102,7 +103,8 @@ class Settings : public virtual Config,
+                  private LocalSettings,
+                  private LogFileSettings,
+                  private WorkerSettings,
+-                 private NarInfoDiskCacheSettings
++                 private NarInfoDiskCacheSettings,
++                 private AttestationSettings
+ {
+ private:
+     void anchor() override;
+@@ -169,6 +171,19 @@ public:
+         return *this;
+     }
+ 
++    /**
++     * Get the attestation settings.
++     */
++    AttestationSettings & getAttestationSettings()
++    {
++        return *this;
++    }
++
++    const AttestationSettings & getAttestationSettings() const
++    {
++        return *this;
++    }
++
+     static unsigned int getDefaultCores();
+ 
+     /**
+diff --git a/src/libstore/include/nix/store/legacy-ssh-store.hh b/src/libstore/include/nix/store/legacy-ssh-store.hh
+index bf1532b8ba25d21b03c3686a80dfa114de166691..ee8123033f558e977dbc0434ff58ee93afc87d2c 100644
+--- a/src/libstore/include/nix/store/legacy-ssh-store.hh
++++ b/src/libstore/include/nix/store/legacy-ssh-store.hh
+@@ -91,6 +91,9 @@ public:
+ 
+     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
+ 
++    void addAttestationSidecar(
++        const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig) override;
++
+     void narFromPath(const StorePath & path, Sink & sink) override;
+ 
+     /**
+diff --git a/src/libstore/include/nix/store/local-store.hh b/src/libstore/include/nix/store/local-store.hh
+index 36be56379ac7503c964309c19581eacf1f0d69aa..61a178b888f0c248f5e43858a9ad07577f19bcc1 100644
+--- a/src/libstore/include/nix/store/local-store.hh
++++ b/src/libstore/include/nix/store/local-store.hh
+@@ -295,6 +295,9 @@ public:
+ 
+     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
+ 
++    void addAttestationSidecar(
++        const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig) override;
++
+     StorePath addToStoreFromDump(
+         Source & dump,
+         std::string_view name,
+@@ -467,6 +470,11 @@ public:
+         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+ 
+     std::optional<std::string> getVersion() override;
++ 
++    /**
++     * Delete a path from the Nix store.
++    */
++    void invalidatePathChecked(const StorePath & path);
+ 
+ protected:
+ 
+@@ -503,11 +511,6 @@ private:
+ 
+     void invalidatePath(State & state, const StorePath & path);
+ 
+-    /**
+-     * Delete a path from the Nix store.
+-     */
+-    void invalidatePathChecked(const StorePath & path);
+-
+     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
+ 
+     void updatePathInfo(State & state, const ValidPathInfo & info);
+diff --git a/src/libstore/include/nix/store/meson.build b/src/libstore/include/nix/store/meson.build
+index af82f8dea44996d3e4cbefa800f30b54f5f8a853..393c8728e9f3aea6eb3eded1023eb00236b4d925 100644
+--- a/src/libstore/include/nix/store/meson.build
++++ b/src/libstore/include/nix/store/meson.build
+@@ -10,6 +10,8 @@ config_pub_h = configure_file(
+ )
+ 
+ headers = [ config_pub_h ] + files(
++  'attestation-settings.hh',
++  'attestation.hh',
+   'aws-creds.hh',
+   'binary-cache-store.hh',
+   'build-result.hh',
+diff --git a/src/libstore/include/nix/store/serve-protocol.hh b/src/libstore/include/nix/store/serve-protocol.hh
+index 94a250b2e3c0521469b74ca33ddb55f0892f0612..681dbe603c9d82bfca63919a661dbdf3f8faadce 100644
+--- a/src/libstore/include/nix/store/serve-protocol.hh
++++ b/src/libstore/include/nix/store/serve-protocol.hh
+@@ -8,7 +8,7 @@ namespace nix {
+ #define SERVE_MAGIC_1 0x390c9deb
+ #define SERVE_MAGIC_2 0x5452eecb
+ 
+-#define SERVE_PROTOCOL_VERSION (2 << 8 | 8)
++#define SERVE_PROTOCOL_VERSION (2 << 8 | 9)
+ #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
+ #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
+ struct StoreDirConfig;
+@@ -69,7 +69,7 @@ struct ServeProto
+ 
+     static constexpr Version latest = {
+         .major = 2,
+-        .minor = 8,
++        .minor = 9,
+     };
+ 
+     /**
+@@ -152,6 +152,8 @@ enum struct ServeProto::Command : uint64_t {
+     QueryClosure = 7,
+     BuildDerivation = 8,
+     AddToStoreNar = 9,
++    /** `{hashPart}.attestation.json` + `.sig` before AddToStoreNar (protocol 2.9). */
++    PutAttestation = 10,
+ };
+ 
+ struct ServeProto::BuildOptions
+diff --git a/src/libstore/include/nix/store/store-api.hh b/src/libstore/include/nix/store/store-api.hh
+index 06122cc746cd378bb2e43e56b90757dbd6a3e26b..9c5c09af485d7291b9260ecccddbbd626cb8ad2b 100644
+--- a/src/libstore/include/nix/store/store-api.hh
++++ b/src/libstore/include/nix/store/store-api.hh
+@@ -674,6 +674,15 @@ public:
+         RepairFlag repair = NoRepair,
+         CheckSigsFlag checkSigs = CheckSigs) = 0;
+ 
++    /**
++     * Optional `{hashPart}.attestation.json` (and `.sig`) for a path.
++     * Callers send this *before* the NAR when the destination verifies
++     * on ingest. Default is a no-op; binary caches, local stores, and
++     * ssh:// (serve 2.9) override this.
++     */
++    virtual void addAttestationSidecar(
++        const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig);
++
+     /**
+      * A list of paths infos along with a source providing the content
+      * of the associated store path
+diff --git a/src/libstore/include/nix/store/worker-settings.hh b/src/libstore/include/nix/store/worker-settings.hh
+index ab08e20176d39578ff0af5284dbbaf4f2880140f..cc5d5a24d6f47886a6aea0e1003fc243405ba034 100644
+--- a/src/libstore/include/nix/store/worker-settings.hh
++++ b/src/libstore/include/nix/store/worker-settings.hh
+@@ -292,7 +292,7 @@ public:
+ 
+     Setting<std::vector<StoreReference>> substituters{
+         this,
+-        std::vector<StoreReference>{StoreReference::parse("https://cache.nixos.org/")},
++        {},
+         "substituters",
+         R"(
+           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
+@@ -300,7 +300,9 @@ public:
+ 
+           Substituters are tried based on their priority value, which each substituter can set independently.
+           Lower value means higher priority.
+-          The default is `https://cache.nixos.org`, which has a priority of 40.
++          This fork defaults to an empty list (not `https://cache.nixos.org`).
++          A listed substituter is used only after its CACTEE certificate
++          verifies. cache.nixos.org is not contacted unless nix.conf adds it.
+ 
+           At least one of the following conditions must be met for Nix to use a substituter:
+ 
+diff --git a/src/libstore/legacy-ssh-store.cc b/src/libstore/legacy-ssh-store.cc
+index 1765c5af747aadf3f3cf7f24e4be95a3ca85561c..4105e55fc6cd4aaa9f4e970ed61c41869e6d0d71 100644
+--- a/src/libstore/legacy-ssh-store.cc
++++ b/src/libstore/legacy-ssh-store.cc
+@@ -1,3 +1,4 @@
++#include "nix/store/attestation.hh"
+ #include "nix/store/legacy-ssh-store.hh"
+ #include "nix/store/common-ssh-store-config.hh"
+ #include "nix/util/archive.hh"
+@@ -222,6 +223,13 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, Rep
+         throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
+ }
+ 
++void LegacySSHStore::addAttestationSidecar(
++    const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig)
++{
++    /* Do not send the certificate over serve. Verification happens on this client. */
++    verifyIncomingAttestation(*this, settings.getAttestationSettings(), path, narHash, json, sig);
++}
++
+ void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
+ {
+     narFromPath(path, [&](auto & source) { copyNAR(source, sink); });
+diff --git a/src/libstore/local-store.cc b/src/libstore/local-store.cc
+index edacae79c4e27931fd82656fdeeb57658bc3c0f7..260431d8d0cdbde067571a5497606dd324a2bfc2 100644
+--- a/src/libstore/local-store.cc
++++ b/src/libstore/local-store.cc
+@@ -1,4 +1,5 @@
+ #include "nix/store/local-store.hh"
++#include "nix/store/attestation.hh"
+ #include "nix/store/build.hh"
+ #include "nix/store/globals.hh"
+ #include "nix/store/path-references.hh"
+@@ -585,7 +586,7 @@ void LocalStore::openDB(State & state, bool create)
+     /* Initialise the database schema, if necessary. */
+     if (create) {
+         db.exec({
+-#embed "schema.sql"
++#include "schema.sql.gen.hh"
+         });
+     }
+ }
+@@ -644,7 +645,7 @@ bool LocalStore::upgradeDBSchema(State & state, bool dryRun)
+         maybeUpgrade(
+             "20251017-ca-derivations",
+             {
+-#embed "ca-specific-schema.sql"
++#include "ca-specific-schema.sql.gen.hh"
+             });
+     }
+ 
+@@ -1071,6 +1072,14 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
+     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
+ }
+ 
++void LocalStore::addAttestationSidecar(
++    const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig)
++{
++    auto & att = settings.getAttestationSettings();
++    verifyIncomingAttestation(*this, att, path, narHash, json, sig);
++    installAttestationSidecar(*this, path, narHash, json, sig);
++}
++
+ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
+ {
+     if (checkSigs && pathInfoIsUntrusted(info))
+diff --git a/src/libstore/meson.build b/src/libstore/meson.build
+index 1a66d4bf08fa4076a8083d1ba7e0fce5b4e44056..a9be4e6b5617f74b2582793b38a0f4ecda112451 100644
+--- a/src/libstore/meson.build
++++ b/src/libstore/meson.build
+@@ -159,6 +159,15 @@ endif
+ nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
+ deps_public += nlohmann_json
+ 
++# certificate-verifier.cc (via cactee-link.cc) calls libcrypto directly.
++# libnixutil also links it, but those symbols are not re-exported.
++openssl = dependency(
++  'libcrypto',
++  'openssl',
++  version : '>= 1.1.1',
++)
++deps_private += openssl
++
+ sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
+ deps_private += sqlite
+ 
+@@ -178,6 +187,10 @@ configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
+ 
+ busybox = find_program(get_option('sandbox-shell'), required : false)
+ 
++# Always defined: linux-derivation-builder.cc uses #if HAVE_EMBEDDED_SANDBOX_SHELL
++# and -Werror=undef rejects an undefined name even when the branch is dead.
++configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 0)
++
+ if get_option('embedded-sandbox-shell')
+   configdata_priv.set_quoted('SANDBOX_SHELL', '__embedded_sandbox_shell__')
+   configdata_priv.set_quoted('EMBEDDED_SANDBOX_SHELL_PATH', busybox.full_path())
+@@ -255,7 +268,16 @@ config_priv_h = configure_file(
+ 
+ subdir('nix-meson-build-support/common')
+ 
++# local-store.cc reads the two schemas with #embed, which needs GCC 15 or
++# Clang 19. The pinned nixpkgs has neither, so wrap them as raw string literals
++# the way the tree did before #embed landed. gen_header drops
++# '<name>.gen.hh' in the target's private directory, which is already on the
++# include path.
++subdir('nix-meson-build-support/generate-header')
++
+ sources = files(
++  'attestation.cc',
++  'cactee-link.cc',
+   'binary-cache-store.cc',
+   'build-result.cc',
+   'build/build-log.cc',
+@@ -345,6 +367,11 @@ sources = files(
+   'worker-protocol.cc',
+ )
+ 
++sources += [
++  gen_header.process('schema.sql'),
++  gen_header.process('ca-specific-schema.sql'),
++]
++
+ # AWS credentials code requires AWS CRT, so only compile when enabled
+ if s3_aws_auth.enabled()
+   sources += files('aws-creds.cc')
+diff --git a/src/libstore/package.nix b/src/libstore/package.nix
+index 69f79153ee152c2827f6e30058a6d1cffdb101e3..7fc4d36347265083d9d5ee454d3830daa0375ccf 100644
+--- a/src/libstore/package.nix
++++ b/src/libstore/package.nix
+@@ -14,6 +14,7 @@
+   aws-crt-cpp,
+   libseccomp,
+   nlohmann_json,
++  openssl,
+   sqlite,
+   cmake, # for resolving aws-crt-cpp dep
+ 
+@@ -55,6 +56,8 @@ mkMesonLibrary (finalAttrs: {
+     ../../.version
+     ./.version
+     ./meson.build
++    ../certification-verification/certificate-verifier.cc
++    ../certification-verification/Include/certificate-verifier.hh
+     ./meson.options
+     ./include/nix/store/meson.build
+     ./linux/meson.build
+@@ -77,6 +80,7 @@ mkMesonLibrary (finalAttrs: {
+   buildInputs = [
+     boost
+     curl
++    openssl
+     sqlite
+   ]
+   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+diff --git a/src/libstore/store-api.cc b/src/libstore/store-api.cc
+index 2402faece35d312bf943f6bf64f08ef04829aa0d..04ec4a42fd0f69e65777ce319376c8b75d8b9090 100644
+--- a/src/libstore/store-api.cc
++++ b/src/libstore/store-api.cc
+@@ -12,6 +12,7 @@
+ #include "nix/store/build.hh"
+ #include "nix/store/store-open.hh"
+ #include "nix/store/outputs-query.hh"
++#include "nix/store/attestation.hh"
+ #include "nix/util/util.hh"
+ #include "nix/store/nar-info-disk-cache.hh"
+ #include "nix/util/thread-pool.hh"
+@@ -22,6 +23,7 @@
+ #include "nix/util/signals.hh"
+ #include "nix/util/environment-variables.hh"
+ #include "nix/util/file-system.hh"
++#include "nix/store/local-store.hh"
+ 
+ #include "store-config-private.hh"
+ 
+@@ -221,6 +223,12 @@ StorePath Store::addToStore(
+     return storePath.value();
+ }
+ 
++void Store::addAttestationSidecar(
++    const StorePath & path, const Hash & narHash, std::string_view json, std::string_view sig)
++{
++    verifyIncomingAttestation(*this, settings.getAttestationSettings(), path, narHash, json, sig);
++}
++
+ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
+ {
+     std::atomic<size_t> nrDone{0};
+@@ -921,10 +929,11 @@ makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std:
+ void copyStorePath(
+     Store & srcStore, Store & dstStore, const StorePath & storePath, RepairFlag repair, CheckSigsFlag checkSigs)
+ {
+-    /* Bail out early (before starting a download from srcStore) if
+-       dstStore already has this path. */
+-    if (!repair && dstStore.isValidPath(storePath))
++    /* Skip NAR download if dest already has the path; still copy the sidecar. */
++    if (!repair && dstStore.isValidPath(storePath)) {
++        copyAttestationSidecar(srcStore, dstStore, storePath);
+         return;
++    }
+ 
+     const auto & srcCfg = srcStore.config;
+     const auto & dstCfg = dstStore.config;
+@@ -977,6 +986,18 @@ void copyStorePath(
+         });
+ 
+     dstStore.addToStore(*info, *source, repair, checkSigs);
++    try {
++        copyAttestationSidecar(srcStore, dstStore, storePath);
++        verifyPathAttestation(
++            dstStore,
++            settings.getAttestationSettings(),
++            info->path,
++            info->narHash.to_string(HashFormat::SRI, true));
++    } catch (...) {
++        if (auto * local = dynamic_cast<LocalStore *>(&dstStore))
++            local->invalidatePathChecked(info->path);
++        throw;
++    }
+ }
+ 
+ std::map<StorePath, StorePath> copyPaths(
+@@ -1036,9 +1057,12 @@ std::map<StorePath, StorePath> copyPaths(
+         if (!valid.count(path))
+             missing.insert(path);
+ 
+-    /* Don't start an activity if there's no work to do. */
+-    if (missing.empty())
++    /* Don't start an activity if there's no NAR work; still copy certs. */
++    if (missing.empty()) {
++        for (auto & path : storePaths)
++            copyAttestationSidecar(srcStore, dstStore, path);
+         return {};
++    }
+ 
+     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+ 
+@@ -1105,8 +1129,16 @@ std::map<StorePath, StorePath> copyPaths(
+         pathsToCopy.emplace_back(std::move(infoForDst), std::move(source));
+     }
+ 
++    /* Sidecars first so serve 2.9 can verify signatures before the NAR. */
++    for (auto & path : missing)
++        copyAttestationSidecar(srcStore, dstStore, path);
++
+     dstStore.addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);
+ 
++    for (auto & path : storePaths)
++        if (valid.count(path))
++            copyAttestationSidecar(srcStore, dstStore, path);
++
+     return pathsMap;
+ }
+ 
+diff --git a/src/nix/nix-store/nix-store.cc b/src/nix/nix-store/nix-store.cc
+index 821da8ddc3165d5b0d5be84de23b5d741cf144b0..dddd224aa87dc6956202d8e13c8c86391fbabf36 100644
+--- a/src/nix/nix-store/nix-store.cc
++++ b/src/nix/nix-store/nix-store.cc
+@@ -11,6 +11,8 @@
+ #include "nix/store/local-store.hh"
+ #include "nix/store/serve-protocol.hh"
+ #include "nix/store/serve-protocol-connection.hh"
++#include "nix/store/attestation.hh"
++#include "nix/util/hash.hh"
+ #include "nix/main/shared.hh"
+ #include "graphml.hh"
+ #include "nix/cmd/legacy.hh"
+@@ -794,6 +796,74 @@ static void opImport(Strings opFlags, Strings opArgs)
+         std::cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
+ }
+ 
++/* Import a single NAR at a known input-addressed store path and bind
++   its attestation sidecar so nix-copy-closure can send both. */
++static void opImportNar(Strings opFlags, Strings opArgs)
++{
++    std::optional<Hash> expectedHash;
++    std::optional<StorePath> deriver;
++    StorePathSet references;
++    std::optional<std::filesystem::path> attJson;
++    std::optional<std::filesystem::path> attSig;
++
++    for (auto i = opFlags.begin(); i != opFlags.end();) {
++        auto flag = *i++;
++        if (i == opFlags.end())
++            throw UsageError("'%s' requires an argument", flag);
++        auto value = *i++;
++        if (flag == "--nar-hash")
++            expectedHash = Hash::parseAnyPrefixed(value);
++        else if (flag == "--deriver")
++            deriver = store->parseStorePath(value);
++        else if (flag == "--references")
++            references.insert(store->parseStorePath(value));
++        else if (flag == "--attestation-json")
++            attJson = absPath(value);
++        else if (flag == "--attestation-sig")
++            attSig = absPath(value);
++        else
++            throw UsageError("unknown flag '%s'", flag);
++    }
++
++    if (opArgs.size() != 2)
++        throw UsageError("'--import-nar' requires a store path and a NAR file");
++
++    auto arg = opArgs.begin();
++    auto storePath = store->parseStorePath(*arg++);
++    auto narFile = absPath(*arg);
++
++    HashSink hashSink(HashAlgorithm::SHA256);
++    readFile(narFile, hashSink);
++    auto hashed = hashSink.finish();
++    if (expectedHash && hashed.hash != *expectedHash)
++        throw Error(
++            "NAR hash mismatch for '%s';\n  specified: %s\n  got:       %s",
++            store->printStorePath(storePath),
++            expectedHash->to_string(HashFormat::SRI, true),
++            hashed.hash.to_string(HashFormat::SRI, true));
++
++    auto & att = settings.getAttestationSettings();
++    if (attJson) {
++        auto json = readFile(*attJson);
++        std::string sig = attSig ? readFile(*attSig) : "";
++        verifyIncomingAttestation(*store, att, storePath, hashed.hash, json, sig);
++    } else
++        bindAttestationSidecarFromDisk(*store, storePath, hashed.hash);
++
++    if (!store->isValidPath(storePath)) {
++        UnkeyedValidPathInfo info(*store, hashed.hash);
++        info.narSize = hashed.numBytesDigested;
++        info.references = std::move(references);
++        info.deriver = std::move(deriver);
++        ValidPathInfo vpi(storePath, std::move(info));
++        AutoCloseFD fd = openFileReadonly(narFile);
++        FdSource source(fd.get());
++        store->addToStore(vpi, source, NoRepair, NoCheckSigs);
++    }
++
++    std::cout << fmt("%s\n", store->printStorePath(storePath)) << std::flush;
++}
++
+ /* Initialise the Nix databases. */
+ static void opInit(Strings opFlags, Strings opArgs)
+ {
+@@ -1084,6 +1154,22 @@ static void opServe(Strings opFlags, Strings opArgs)
+             break;
+         }
+ 
++        case ServeProto::Command::PutAttestation: {
++            if (!writeAllowed)
++                throw Error("importing attestation sidecars is not allowed");
++            if (clientVersion < ServeProto::Version{2, 9})
++                throw Error("PutAttestation requires serve protocol 2.9");
++
++            auto path = store->parseStorePath(readString(in));
++            auto narHash = Hash::parseAny(readString(in), HashAlgorithm::SHA256);
++            auto json = readString(in);
++            auto sig = readString(in);
++            auto & att = settings.getAttestationSettings();
++            verifyIncomingAttestation(*store, att, path, narHash, json, sig);
++            out << 1;
++            break;
++        }
++
+         default:
+             throw Error("unknown serve command %1%", cmd);
+         }
+@@ -1182,6 +1268,9 @@ static int main_nix_store(int argc, char ** argv)
+             } else if (*arg == "--import") {
+                 op = opImport;
+                 opName = arg->substr(1);
++            } else if (*arg == "--import-nar") {
++                op = opImportNar;
++                opName = arg->substr(1);
+             } else if (*arg == "--init")
+                 op = opInit;
+             else if (*arg == "--verify") {
+@@ -1202,9 +1291,19 @@ static int main_nix_store(int argc, char ** argv)
+             } else if (*arg == "--generate-binary-cache-key") {
+                 op = opGenerateBinaryCacheKey;
+                 opName = arg->substr(1);
+-            } else if (*arg == "--add-root")
++            }             else if (*arg == "--add-root")
+                 gcRoot = absPath(getArg(*arg, arg, end));
+-            else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
++            else if (
++                *arg == "--nar-hash" || *arg == "--deriver" || *arg == "--attestation-json"
++                || *arg == "--attestation-sig"
++                || (*arg == "--references" && op != opQuery)) {
++                /* `nix-store -q --references PATH` is a query. Only
++                   --import-nar uses --references as a flag that takes the
++                   next argument. Consuming the path here makes -q fail with
++                   "unknown flag '/nix/store/...'". */
++                opFlags.push_back(*arg);
++                opFlags.push_back(getArg(*arg, arg, end));
++            } else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
+                 readFromStdIn = true;
+             else if (*arg == "--indirect")
+                 ;

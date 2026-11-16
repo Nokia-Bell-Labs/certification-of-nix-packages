@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<!--
+© 2026 Nokia
+Licensed under the MIT License
+SPDX-License-Identifier: MIT
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Graphe .drv duplique - 49 layers</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: Segoe UI, system-ui, sans-serif; background: #e8eef6; color: #0f172a; }
+  body { display: flex; flex-direction: column; }
+  header { flex: 0 0 auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 14px; background: #fff; border-bottom: 1px solid #dbe3ee; }
+  h1 { font-size: 15px; margin: 0; }
+  .meta { color: #64748b; font-size: 12px; }
+  input[type=search] { height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px; min-width: 220px; }
+  input[type=range] { width: 180px; }
+  button { height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 12px; background: #0f172a; color: #fff; cursor: pointer; }
+  button.secondary { background: #fff; color: #0f172a; }
+  .note { flex: 0 0 auto; padding: 8px 14px; font-size: 12px; color: #334155; background: #fff7ed; border-bottom: 1px solid #fed7aa; }
+  #err { flex: 0 0 auto; display: none; padding: 16px; color: #b91c1c; font-size: 14px; white-space: pre-wrap; }
+  #stage { flex: 1 1 auto; min-height: 0; overflow: auto; cursor: grab; background: #f8fafc; }
+  #stage.drag { cursor: grabbing; user-select: none; }
+  svg { display: block; }
+  .dim rect { opacity: 0.10; }
+  .dim text { opacity: 0.10; }
+  .hot rect { stroke: #1d4ed8; stroke-width: 2.5; }
+  .dep rect { stroke: #2563eb; stroke-width: 1.6; }
+  #panel { position: absolute; right: 12px; top: 108px; width: 300px; background: #fff; border: 1px solid #dbe3ee; border-radius: 8px; padding: 12px; font-size: 12px; display: none; z-index: 2; }
+  #panel h2 { margin: 0 0 6px; font-size: 13px; }
+  #panel code { font-size: 10px; color: #475569; word-break: break-all; }
+  label.jump { font-size: 12px; color: #334155; display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Graphe .drv duplique - 49 layers (0 a 48)</h1>
+    <div class="meta">5123 instances - 225 hashes uniques - molette = defiler - Ctrl+molette = zoom - clic = arbre de dependances</div>
+  </div>
+  <input id="q" type="search" placeholder="Chercher un .drv"/>
+  <label class="jump">Layer <input id="jump" type="range" min="0" max="48" value="0"/> <b id="jumpLab">L0</b></label>
+  <button type="button" class="secondary" id="zoomOut">-</button>
+  <button type="button" class="secondary" id="zoomIn">+</button>
+  <button type="button" id="dlSvg">Telecharger SVG</button>
+  <button type="button" class="secondary" id="reset">Reinitialiser</button>
+</header>
+<div class="note">Source: mario-drv-graph.dot. Clique un noeud pour surligner toutes ses dependances. Orange = copie d un hash deja vu. Mario reste en bleu. Molette = defiler jusqu au dernier layer.</div>
+<div id="err"></div>
+<div id="stage"></div>
+<aside id="panel">
+  <h2 id="pTitle"></h2>
+  <div id="pMeta"></div>
+  <p><code id="pId"></code></p>
+</aside>
+<script>const DRV = {"labels":["file-5.45.drv","acl-2.3.2.tar.gz.drv","bootstrap-tools.drv","update-autotools-gnu-config-scripts-hook.drv","libidn2-2.3.8.drv","busybox.drv","linux-headers-6.12.7.drv","gnum4-1.4.19.drv","pcre2-10.44.drv","bootstrap-stage3-gcc-wrapper-14.3.0.drv","findutils-4.10.0.tar.xz.drv","gmp-6.3.0.drv","mpc-1.3.1.tar.gz.drv","bash52-033.drv","gnused-4.9.drv","bash52-036.drv","gawk-5.3.2.drv","bash52-006.drv","binutils-wrapper-2.44.drv","bootstrap-stage-xgcc-stdenv-linux.drv","bootstrap-stage3-stdenv-linux.drv","bash-5.2p37.drv","bootstrap-stage0-stdenv-linux.drv","binutils-2.44.drv","gmp-6.3.0.drv","libidn2-2.3.8.tar.gz.drv","gnu-config-2024-01-01.drv","automake-1.16.5.tar.xz.drv","bootstrap-stage3-stdenv-linux.drv","binutils-with-gold-2.44.tar.bz2.drv","libffi-3.4.8.drv","mpfr-4.2.2.drv","python-setup-hook.sh.drv","glibc-2.40.tar.xz.drv","gnumake-4.4.1.drv","bash-5.2.tar.gz.drv","patch-2.7.6.drv","gnu-config-2024-01-01.drv","pkg-config-0.29.2.tar.gz.drv","pkg-config-wrapper-0.29.2.drv","bash52-003.drv","python-setup-hook.sh.drv","texinfo-7.2.drv","update-autotools-gnu-config-scripts-hook.drv","bash52-009.drv","file-5.45.drv","tar-1.35.tar.xz.drv","gawk-5.3.2.tar.xz.drv","attr-2.5.2.tar.gz.drv","gcc-14.3.0.drv","bash52-014.drv","patchelf-0.15.0.drv","bash52-030.drv","texinfo-7.2.tar.xz.drv","expat-2.7.1.drv","bash52-017.drv","diffutils-3.12.drv","libxcrypt-4.4.38.drv","python3-minimal-3.12.11.drv","gnu-config-2024-01-01.drv","mario-1.0.drv","bash-5.2p37.drv","isl-0.20.drv","bash52-034.drv","bash52-005.drv","gnu-config-2024-01-01.drv","bootstrap-stage1-stdenv-linux.drv","bash52-012.drv","binutils-2.44.drv","which-2.23.drv","bash52-015.drv","patch-2.7.6.tar.xz.drv","bootstrap-stage1-gcc-wrapper-.drv","die-hook.drv","automake-1.16.5.drv","config.guess-948ae97.drv","bzip2-1.0.8.drv","coreutils-9.7.tar.xz.drv","lzip-1.25.tar.gz.drv","expand-response-params.drv","xz-5.8.1.drv","glibc-locales-2.40-66.drv","bash-5.2p37.drv","binutils-patchelfed-ld-2.44.drv","gnutar-1.35.drv","mpdecimal-4.0.0.drv","make-4.4.1.tar.gz.drv","mpdecimal-4.0.0.tar.gz.drv","bootstrap-stage0-glibc-iconv-bootstrapFiles.drv","bash52-027.drv","autoreconf-hook.drv","autoconf-2.72.drv","bash52-029.drv","bash52-024.drv","grep-3.11.tar.xz.drv","libxcrypt-4.4.38.drv","bash52-008.drv","nuke-references.drv","make-shell-wrapper-hook.drv","expand-response-params.drv","bash52-019.drv","attr-2.5.2.drv","bison-3.8.2.drv","bootstrap-stage1-stdenv-linux.drv","which-2.23.tar.gz.drv","bootstrap-stage4-gcc-wrapper-14.3.0.drv","bootstrap-stage2-gcc-wrapper-14.3.0.drv","patchelf-0.15.0.drv","gmp-with-cxx-6.3.0.drv","pkg-config-0.29.2.drv","zlib-1.3.1.tar.gz.drv","pkg-config-wrapper-0.29.2.drv","bash52-020.drv","libtool-2.5.4.drv","gettext-0.22.5.drv","autoconf-2.72.tar.xz.drv","autoreconf-hook.drv","mpfr-4.2.2.tar.xz.drv","libxcrypt-4.4.38.drv","libtool-2.5.4.tar.gz.drv","ed-1.21.1.tar.lz.drv","stdenv-linux.drv","bash52-002.drv","gettext-0.22.5.tar.gz.drv","autoconf-archive-2024.10.16.drv","zlib-1.3.1.drv","glibc-2.40-66.drv","libtool-2.5.4.drv","bash52-037.drv","mpdecimal-4.0.0.drv","locales-setup-hook.sh.drv","file-5.45.tar.gz.drv","patchelf-0.15.0.drv","bash52-013.drv","bash52-010.drv","nuke-references.drv","nuke-references.drv","bash52-022.drv","bash52-026.drv","gettext-0.22.5.drv","xz-5.8.1.drv","automake-1.16.5.drv","diffutils-3.12.tar.xz.drv","gzip-1.14.tar.xz.drv","bzip2-1.0.8.tar.gz.drv","expat-2.7.1.tar.xz.drv","update-autotools-gnu-config-scripts-hook.drv","ed-1.21.1.drv","zlib-1.3.1.drv","bootstrap-stage2-stdenv-linux.drv","update-autotools-gnu-config-scripts-hook.drv","bash52-018.drv","bash52-001.drv","config.sub-948ae97.drv","xz-5.8.1.drv","autoconf-2.72.drv","bash52-011.drv","glibc-iconv-2.40.drv","gcc-wrapper-14.3.0.drv","xgcc-14.3.0.drv","gnu-config-2024-01-01.drv","expat-2.7.1.drv","Python-3.12.11.tar.xz.drv","bash52-004.drv","linux-6.12.7.tar.xz.drv","bootstrap-stage0-binutils-wrapper-.drv","binutils-wrapper-2.44.drv","patchelf-0.15.0.tar.bz2.drv","bootstrap-stage4-stdenv-linux.drv","findutils-4.10.0.drv","bootstrap-stage4-stdenv-linux.drv","gzip-1.14.drv","sed-4.9.tar.xz.drv","python3-minimal-3.12.11.drv","bash52-023.drv","xz-5.8.1.tar.xz.drv","isl-0.20.tar.xz.drv","update-autotools-gnu-config-scripts-hook.drv","libffi-3.4.8.tar.gz.drv","libxcrypt-4.4.38.tar.xz.drv","bootstrap-stage2-stdenv-linux.drv","lzip-1.25.drv","libmpc-1.3.1.drv","libunistring-1.3.tar.gz.drv","m4-1.4.19.tar.bz2.drv","bootstrap-stage0-glibc-bootstrapFiles.drv","bash52-032.drv","bash52-007.drv","pcre2-10.44.tar.bz2.drv","bzip2-1.0.8.drv","autoconf-archive-2024.10.16.drv","bash-5.2p37.drv","binutils-patchelfed-ld-wrapper-2.44.drv","libffi-3.4.8.drv","update-autotools-gnu-config-scripts-hook.drv","zlib-1.3.1.drv","expand-response-params.drv","bash52-016.drv","libmpc-1.3.1.drv","bison-3.8.2.tar.gz.drv","perl-5.40.0.drv","bash52-025.drv","texinfo-7.2.drv","bash52-035.drv","acl-2.3.2.drv","expand-response-params.drv","bootstrap-tools.tar.xz.drv","gcc-14.3.0.tar.xz.drv","bash-5.2p37.drv","autoconf-archive-2024.10.16.tar.xz.drv","gnugrep-3.11.drv","libunistring-1.3.drv","nuke-references.drv","bash52-021.drv","mpfr-4.2.2.drv","bash52-031.drv","bootstrap-stage-xgcc-stdenv-linux.drv","perl-5.40.0.tar.gz.drv","bootstrap-stage-xgcc-gcc-wrapper-.drv","gmp-6.3.0.tar.bz2.drv","bash52-028.drv","isl-0.20.drv","gnu-config-2024-01-01.drv","pkg-config-0.29.2.drv","coreutils-9.7.drv"],"ids":["02bq9rp9f2jmqhml6byjllkzm8clwfjs-file-5.45.drv","0442lf73plz43gym6ahgydmp752dxczk-acl-2.3.2.tar.gz.drv","05q48dcd4lgk4vh7wyk330gr2fr082i2-bootstrap-tools.drv","0ig0j7mkdzpkminj6nz1aficvsr9wd4z-update-autotools-gnu-config-scripts-hook.drv","0l6611hmavdzb322ail1bxz6xmx1myk7-libidn2-2.3.8.drv","0m4y3j4pnivlhhpr5yqdvlly86p93fwc-busybox.drv","0wmcgqrk7y5g5mxyjv54i53mrlfdd3gr-linux-headers-6.12.7.drv","0wwrslhwr8frvwy58wxbh5kavzx3ajx9-gnum4-1.4.19.drv","0ygrj34jn72lbam8fj9afcm78371krz0-pcre2-10.44.drv","0yvz2i5f53xzv6abyrcb4dcnvhiwbvc4-bootstrap-stage3-gcc-wrapper-14.3.0.drv","130xp3xbhxwms383bbf7wpcvc6ksjjnk-findutils-4.10.0.tar.xz.drv","13cspisllxd67503vzk9d7x1fnfn9k9n-gmp-6.3.0.drv","156yvnw4g1h0gv1s8p7bray6hyn43f8q-mpc-1.3.1.tar.gz.drv","1crz16gbhsxjxkyp2zxjf5y7a224m4j7-bash52-033.drv","1lx6b50aknhqq4iqf73lv7lfkb5lvxv6-gnused-4.9.drv","1nxiwvixsmf8mqg06602a07pybrcdmc5-bash52-036.drv","1ph6xa9d5k7zdc0v1wfyzj22sf4a6zkr-gawk-5.3.2.drv","1rfn1ylygzdbca5b54qjs6n4vnnsx85f-bash52-006.drv","1s30a4asjww7fs46zlp1wrnxqh0i1ggr-binutils-wrapper-2.44.drv","214188i8bmp1s3wx2mpqp39ka4i4vxyh-bootstrap-stage-xgcc-stdenv-linux.drv","2db55bmjmzpjh85k72kmh2r2qh7yjd27-bootstrap-stage3-stdenv-linux.drv","2w19blxq7a1sznh1hszcskji12a42277-bash-5.2p37.drv","3d3vl6r0v7l9l37y81fqfjnvpvdfvnm4-bootstrap-stage0-stdenv-linux.drv","3icnnysshl8agv7r6wja93s7rzz4vrmi-binutils-2.44.drv","3xfchs1rq2610z56wdkcm0ffmr6y8yvs-gmp-6.3.0.drv","3xs5n9hmbbmc5qis9zzs764ilbjk0v72-libidn2-2.3.8.tar.gz.drv","3y1djyyb5skm46j3hr2vrvmhwjgz1n30-gnu-config-2024-01-01.drv","3yar2pnvz7ll79z3jlzx09qnhrsi7zj5-automake-1.16.5.tar.xz.drv","42nwsr973kqxsz4vxcsyz1102r0kcs52-bootstrap-stage3-stdenv-linux.drv","44sw3grr08hzn0jjg6vcdlxwpakf9jbq-binutils-with-gold-2.44.tar.bz2.drv","4y2jxdcjdy91k6pvq4ncflnk5zxjrgmv-libffi-3.4.8.drv","568kgjgm7b9ff7l8dihjg65qg1vdnnmd-mpfr-4.2.2.drv","58015sws8ifh2dslcv9g8k5yraw425gc-python-setup-hook.sh.drv","5fia0s7sl13hsqbhcmgmjpq84i0rqczs-glibc-2.40.tar.xz.drv","5jpjaq132z2gzzalwrvpkgymll4j9vrj-gnumake-4.4.1.drv","5jrd75v747s76s16zxk59384xfcjqn58-bash-5.2.tar.gz.drv","681z02b556kivl09m82i17hh766mhi01-patch-2.7.6.drv","6azh7lkyjdpcsnslifsdb5jhpcv623jp-gnu-config-2024-01-01.drv","6b29gjz7rj4mw0ch0vy2m6qrqipz2bbb-pkg-config-0.29.2.tar.gz.drv","6fqrxqh4i3ni4dknbi68qy9mm5ablhdg-pkg-config-wrapper-0.29.2.drv","6k05dfl68y2m382xd5hanfvj7j8c73p1-bash52-003.drv","6lb1dcvbi7r7jdhwrw8q81m21hlz5g3x-python-setup-hook.sh.drv","6pzdn8r3by5bjs28mskgcdsaxjv5cdbk-texinfo-7.2.drv","6x3xmf4v9yahlyk3zjinn89alv260827-update-autotools-gnu-config-scripts-hook.drv","6xwbrn3wdxwyphpj64rphhms41vxvqxb-bash52-009.drv","6z8ysvb9122grcmz5b5871smrwj88094-file-5.45.drv","72cmq1ms8qih2svpnw3v1rs9a035h2gy-tar-1.35.tar.xz.drv","79g78vzphsrhzs95ph6g4wcm31d6b1q1-gawk-5.3.2.tar.xz.drv","7byvrfyi1f00i8jxsc1q8z997j9r10y5-attr-2.5.2.tar.gz.drv","7i0f5gfas6iija8i31l7b2bdjpiv779i-gcc-14.3.0.drv","7j0r588ymbv6dq8c98wvzklcsk42wvpb-bash52-014.drv","7namwky34zv95x9z2vcvg32xi09r4jfj-patchelf-0.15.0.drv","7vafnx31pql69fwy9iw5060rilgpssgc-bash52-030.drv","896vsnl7w7rhd17b65j8sp3g4kc0zh35-texinfo-7.2.tar.xz.drv","89vxgm4dd1piyaizi44xx6sgrlzp0gi9-expat-2.7.1.drv","8y6nd0hmkkq8yfalynzh4s6h46sgsan6-bash52-017.drv","9hlzjriw47dzpwgrpn59v8yyficxx82d-diffutils-3.12.drv","9ipn4idz6kw7ilglfz5r2bnpcnaqngpk-libxcrypt-4.4.38.drv","9r62wjjdrsnfndr99kq3ip8fwsprjh2v-python3-minimal-3.12.11.drv","9vqj41i15ssd2zs9l3ajd7i5qc5v5dbv-gnu-config-2024-01-01.drv","9xppv8fijaxf857a49a3xknjs06lml9a-mario-1.0.drv","a09yrgnhzidd9rfa4c5i2hccgsld2hy3-bash-5.2p37.drv","a399iygg38pmjgjz5y4n6v7lplybq59x-isl-0.20.drv","a3s5h88yyh8nqxnqa27l5d934si9khb9-bash52-034.drv","a68j9bys24cr3m1bixy4bz92q27bmx7k-bash52-005.drv","abijl898gbkzqwxyc73z1pmnpl3kjx5z-gnu-config-2024-01-01.drv","acrlv2irbxwhg8qa10k45q3qxab47682-bootstrap-stage1-stdenv-linux.drv","ag9cnvb4pcgcj0rbkzva6qdz54fnr8fg-bash52-012.drv","agb7l8ahkha2g3wck36964d85lzqd5jv-binutils-2.44.drv","ah6rxlgahdamqxxnr7f45y0wxfhrni39-which-2.23.drv","ah8jsm934168mfnmkf54fh0ms38k6nsm-bash52-015.drv","angvcbhbr5p8viv4zphsxxx5nl4zr1hi-patch-2.7.6.tar.xz.drv","b0x4nvy1hsmfb6ya67idl1i2wyniwcd5-bootstrap-stage1-gcc-wrapper-.drv","b2ikq9dnw7sz7qy7v5jm7jyzpc4ik7hy-die-hook.drv","b4fmdzgzw7cg7sn8hdy7wrgabajbgblq-automake-1.16.5.drv","bamwxswxacs3cjdcydv0z7bj22d7g2kc-config.guess-948ae97.drv","bg9k77daf0fffax56fcz89spyq82i78k-bzip2-1.0.8.drv","bqbcymfqpw5y44fj5r2x5wws2nsjcfrd-coreutils-9.7.tar.xz.drv","bsf32582y9rl8wy0dmi6h1lfd0f3qklh-lzip-1.25.tar.gz.drv","c1h7q8mwlw556h7n6kp717n102bpinxd-expand-response-params.drv","c93ng76ibm84gip7ivblv7fm17yav91f-xz-5.8.1.drv","chq4yhzmia2803mjq26lhhyzfh8an71i-glibc-locales-2.40-66.drv","cimcx8h7l9ssnbpx7c22z6gj6npscx1m-bash-5.2p37.drv","cnwdgb7rqlm68kz9pkj30ffpdaj552hl-binutils-patchelfed-ld-2.44.drv","cpv9pp8a6g4mk4qjrmj23ii48m8ylw0x-gnutar-1.35.drv","cri2a12lm2icpf1f0d5dwva00qqykkgv-mpdecimal-4.0.0.drv","cxh8cwlp0z4a7xl6bk7zsqr7ci1hzdq6-make-4.4.1.tar.gz.drv","czgzq4viby3xkqf6lp0xi19msls8vja5-mpdecimal-4.0.0.tar.gz.drv","cznbi1a611gyzhn8fmgg9wpz1jnap1n8-bootstrap-stage0-glibc-iconv-bootstrapFiles.drv","disivhy684rpy5lzrcmylgj0xbvflhx3-bash52-027.drv","dlfk2hdlzakmplcq4wnyyr21id248k4j-autoreconf-hook.drv","dmif2v8fa1rdjyp8v4ir6da2q9z322nc-autoconf-2.72.drv","dql52ni1cximn3jir6x0i75iwja9j7x6-bash52-029.drv","dwnaalvf1ch2b37si1hcxx3x3v0ybnck-bash52-024.drv","dygfxqaah0msj9gwn3mxq54i31vni6nd-grep-3.11.tar.xz.drv","f4w72rmx74jkc6am0kx87h9d8v3jy9nf-libxcrypt-4.4.38.drv","f9hs49y4q8bvg4ffdiycbafd5r1gb13r-bash52-008.drv","fczpj488b7p0fbrnmgphkhma1r8hk42m-nuke-references.drv","fgy4nfryj7fl5jcyax04b4gcrirs489h-make-shell-wrapper-hook.drv","fjky5h24bb11vl21wp60s0zfb0pb57yp-expand-response-params.drv","fnrgd1ca2cs2mzy1x95z5c3yi8nsyw2s-bash52-019.drv","frq8ggwnmzd5g366im41sv0wjlsn128d-attr-2.5.2.drv","fry8shmrm4kax8d5wg2swp9pmljp5k2z-bison-3.8.2.drv","fx7qlym3rp9amrxn119q72iizgrmiwpj-bootstrap-stage1-stdenv-linux.drv","g39zbiv8d8qbgzkqk2s03zdfc39b1j4a-which-2.23.tar.gz.drv","gch7rqqyw3lnqplzhl24zkla92i9is77-bootstrap-stage4-gcc-wrapper-14.3.0.drv","ghn031ilhq88i41i9h1m4iy1f0rf7p8d-bootstrap-stage2-gcc-wrapper-14.3.0.drv","gkrprdvy726lnracx7p8rb2r0grjm4p9-patchelf-0.15.0.drv","gl2i6sl48vakly784ypq0m19h5lyhqva-gmp-with-cxx-6.3.0.drv","gslf15i00rxim8x8lbm5d1rr1xh5mxhh-pkg-config-0.29.2.drv","gyks6vvl7x0gq214ldjhi3w4rg37nh8i-zlib-1.3.1.tar.gz.drv","hh5bmibpqq5w6bwgddnm9h8b5bl5iydv-pkg-config-wrapper-0.29.2.drv","hv81fnwf06mhffinfzln6a8rdfl7kg5n-bash52-020.drv","hy2s80fhva5dg9pw96pv0zx4fmw2kka6-libtool-2.5.4.drv","i0ndgn5nkscdf36h29w8jvl70b2pm9cl-gettext-0.22.5.drv","i2pfgljh1az3v0xga8s4kvn7l1kb1nj4-autoconf-2.72.tar.xz.drv","idgqcxgssxb85myarp01hfgy2kqs86rm-autoreconf-hook.drv","ixwy12didmgk7j4z7ghlirpw46ahmhbd-mpfr-4.2.2.tar.xz.drv","iz3fgchqlzi3shmzhlihay425nqy7rr9-libxcrypt-4.4.38.drv","izbfj3rckm6lyip0y99dw9hyyap52kg6-libtool-2.5.4.tar.gz.drv","j151nb5vh176kdrrh1rkilxkdkmvm47w-ed-1.21.1.tar.lz.drv","j2c9icqxbadyawrycqylwrj6zcaxmrzf-stdenv-linux.drv","j2zlvksmwzs79zvsqmz45jn39zsyr31f-bash52-002.drv","j32b0hhb33jyyvzi6xqrgc7j8g5skdlz-gettext-0.22.5.tar.gz.drv","j4w868v0bg31pvqw8vr6p5n2lw64r058-autoconf-archive-2024.10.16.drv","jl4g6mc7hp70z829fmnkzc6yqaz6ha8w-zlib-1.3.1.drv","jsrrm60pz13dd0h59549p329c8mli9qm-glibc-2.40-66.drv","jw1vc9i9vr8mg5dgvc05a5qdz7mysafb-libtool-2.5.4.drv","jxaa5p13rvgwbxm14yqmfxnj3rfj322f-bash52-037.drv","kgqnvqx9v6xxwi18yfbliqrfgm8rvcgr-mpdecimal-4.0.0.drv","kh0h2xr061413m1m3q5mkk65hb044g4d-locales-setup-hook.sh.drv","klfl82nqgac8fyl7z83q1i7rngka20d3-file-5.45.tar.gz.drv","km5jaijf4vfnjrmjj12cp1h4gycgrhwi-patchelf-0.15.0.drv","kssqadrh4044p2na6fclnyh6pv3r9l5s-bash52-013.drv","l81h2pb34h1hrgf8hgayzl28zzmqnfm0-bash52-010.drv","lk3dkpgc4sjv30gn6lhfjqyfjyfsmqhx-nuke-references.drv","lm3nlhywn5m4p8adb1llcflyg6vv39sn-nuke-references.drv","lqxznznzm6v8r2z4k8jsdph11l6970nc-bash52-022.drv","lrxrk69f3d3rpxf43sfibv3cfwwlc2ra-bash52-026.drv","lxcizz0samgrvp8ldknf3vwvxgm2vyzh-gettext-0.22.5.drv","lzbk2m1hk0y4xc15i13z3dng4g01cpsi-xz-5.8.1.drv","m4ii662r36n71m3fvh711b5kmingkw2f-automake-1.16.5.drv","mag3pq29n9f6jw0rb17crny8ilm4kfjy-diffutils-3.12.tar.xz.drv","mbfqb9y6ryn2axyvg797s3lw1w49liz5-gzip-1.14.tar.xz.drv","mhrxc5w6drwi4m5ykbdrayz7869i9mx9-bzip2-1.0.8.tar.gz.drv","mlwanrsqwva1sd1qw5c6mah5x4nc654m-expat-2.7.1.tar.xz.drv","mppbanfjxyxam7wni0x0win3mjh92pxn-update-autotools-gnu-config-scripts-hook.drv","myy5i0jq1vhclb1syyqga8bxzhirb0h9-ed-1.21.1.drv","n4kir45wagapzcaqhmvpm9v6bjzsql8h-zlib-1.3.1.drv","n7nxvwdzhzjgilk4vkprbcl7dhgf8g22-bootstrap-stage2-stdenv-linux.drv","n80vzpqrys1v1hkprfdbdrikgvhy2wbq-update-autotools-gnu-config-scripts-hook.drv","nayxpac1fisgp2xf519mcjch70dwxrah-bash52-018.drv","nb8wd3xgfp34vic7xw7rkb186pq7hwfh-bash52-001.drv","nbsdqpfzh1jlpmh95s69b3iivfcvv3lh-config.sub-948ae97.drv","nliwn72xmphlmsl9n2w4bf7p81phgnx4-xz-5.8.1.drv","nsd2sr5fjzp4h4dim7m9fb6zibvn3bff-autoconf-2.72.drv","nsw82ybp208qkgs87s5b2h74978lrgd8-bash52-011.drv","nxkfpq8lffgm6wqbdxq59cv1n8cbc08j-glibc-iconv-2.40.drv","p4im0xqqxp2nf6bnw9fz06dmddbd3xr4-gcc-wrapper-14.3.0.drv","p8vpplfq13sjvxxvcfswp8p2rajji7yh-xgcc-14.3.0.drv","pb9q1wnzlzzvlcy5g2p10v66czpmz72f-gnu-config-2024-01-01.drv","pcasmq68rabvdfj8fcabrjiq05qzg0wz-expat-2.7.1.drv","pg13i77j3kkdr1csys4sf0jhkc8n2ld2-Python-3.12.11.tar.xz.drv","pk6bdyws4n421ak7mwvk5nkg0li7cvq2-bash52-004.drv","pk951xyr1ivmcd6jjwfp2xyfq3l2lm1y-linux-6.12.7.tar.xz.drv","pq1w644d7l4f82ry0y1r4jdandq0542b-bootstrap-stage0-binutils-wrapper-.drv","pynpk3g62mxfayzgkgp36304b4jl4af0-binutils-wrapper-2.44.drv","q5lq5b7c0i31zxjgm6j5zhp8pg76mwi1-patchelf-0.15.0.tar.bz2.drv","qa2i771kfpk1f2mgf5lfkwhcm8lwjac6-bootstrap-stage4-stdenv-linux.drv","qamnhgmfv5qq7fvzbpgldwj31yldadb8-findutils-4.10.0.drv","qhz9pwa81cw9gqc35f6mk0kgv92h3m9h-bootstrap-stage4-stdenv-linux.drv","qia2vdsi4k67ymazpibanbywfwcqgf8z-gzip-1.14.drv","ql7jhf1wzhazxw4cw627zyls49xm5g3n-sed-4.9.tar.xz.drv","qpsd34j6a5y3w42fy6ml5fgdq6j9ihhq-python3-minimal-3.12.11.drv","qsr1742cyyh6mdq98n90w0dq5782m2b8-bash52-023.drv","qsxr00amrjgxry1hirafhlrzhl9ban5b-xz-5.8.1.tar.xz.drv","qxz8v1gxrrw9j138k2ajl36vcajra8mb-isl-0.20.tar.xz.drv","r3fg29mqjma1mj8qzkdhh80hdy5bspzi-update-autotools-gnu-config-scripts-hook.drv","rb7i915h985kafaclxmasl1d1b8pjg3l-libffi-3.4.8.tar.gz.drv","rc3vnisrzmh0ydp6c1sifcaad232w1fj-libxcrypt-4.4.38.tar.xz.drv","rcyxgswl5s1929fya9cyhx4y98mk593j-bootstrap-stage2-stdenv-linux.drv","rd89d60hhgkyi1a0z7gddbj9wfc0gsqv-lzip-1.25.drv","rladijqbrnzknh57rldzb82fp981fff6-libmpc-1.3.1.drv","rnpc4cjz42m8axyq6sa883i2h8dy6887-libunistring-1.3.tar.gz.drv","rr4cpsx1w84h2l1h71ch8spcp221kzkr-m4-1.4.19.tar.bz2.drv","rr4py3b5lmffcx00x37z73sffz75wraf-bootstrap-stage0-glibc-bootstrapFiles.drv","rslimz8ksg82kp85hfmjrinhpi3s8mzn-bash52-032.drv","rz74q7y5r38in9zdzq9r2brf5yh6lpy5-bash52-007.drv","s53hsvwklglbrqx1ymwzfiz4vb8drqkb-pcre2-10.44.tar.bz2.drv","s562y08ajv05iy56rf7w9axfg2y1kjs1-bzip2-1.0.8.drv","s56ck2r3wg3clkfy97lalg4ksfwcb99j-autoconf-archive-2024.10.16.drv","s8zzmq8g4zh6zmcysn21pz14v660n1pn-bash-5.2p37.drv","s9ilv3ql4wxx5kr6q5mpb9znv97dkkrd-binutils-patchelfed-ld-wrapper-2.44.drv","si2fzyhzzjzg3ar8n9xcgpl8yaqbagxz-libffi-3.4.8.drv","smqq37c0iprfk55gvhmwrsypb1z22857-update-autotools-gnu-config-scripts-hook.drv","svrjm3c7j0imbn60i910znc29iyqcdm8-zlib-1.3.1.drv","v7vndjxpgbps94gyn0hy49v0kjvjbpf2-expand-response-params.drv","v7zbdi2mv0i7h0y06bsb3g8i45bxqxbq-bash52-016.drv","vfaamarifjxnlq6bg7zzdhkfwzxrhhbk-libmpc-1.3.1.drv","vgjfnqbxgxa8a5575bhq07nm35b2l31m-bison-3.8.2.tar.gz.drv","vif7qliqzlzmccf90d0412dkgnq523c5-perl-5.40.0.drv","w6gibnw6js9pxsa8n3fiq0hly0pvkm4p-bash52-025.drv","wgxmv1fszwsb8w58pza8cphj0vnzd9xx-texinfo-7.2.drv","wk235w2h9r4rnnhac7ai94fqah6b5mb4-bash52-035.drv","x6bbjzqgf9z3r9fzpi8g3xd383d89js9-acl-2.3.2.drv","xi6vy4hzx2r7b11ivh2akfqp7424mjja-expand-response-params.drv","xjkydxc0n24mwxp8kh4wn5jq0fppga9k-bootstrap-tools.tar.xz.drv","xnqgvd0v3sq1x2w8ydyp10vmxb0412l1-gcc-14.3.0.tar.xz.drv","xpvpv74kl1a67lkwrkmxca78s6wap1bk-bash-5.2p37.drv","xrx0sjh4966xq6x6yw41r2sdw40x32j5-autoconf-archive-2024.10.16.tar.xz.drv","y0pq8jkp69dz1gpi96mibzghpjivl6lv-gnugrep-3.11.drv","y74q7sgds876xfibvzlcbijwyi3ynrzn-libunistring-1.3.drv","ylwy2drcybl0cscbb49w4qw54rs2ixx4-nuke-references.drv","ymnhhrx4aqn1gw5w43bqdr7bkma6b5xa-bash52-021.drv","ys853q62i7yfxf02k6sy0bnnj8hsp8wz-mpfr-4.2.2.drv","yvqbq2gvsxbw0g959znxvf1li9szz36c-bash52-031.drv","yxfyrbdwg5hwa4df7a8mv5ja8zdbljs9-bootstrap-stage-xgcc-stdenv-linux.drv","z2rvjzfm2crd6hs6qfdwwq4bhk27zw9r-perl-5.40.0.tar.gz.drv","z3jil4xhhzd3x8b3ryccwlg84fxkb6l6-bootstrap-stage-xgcc-gcc-wrapper-.drv","z4x4wa4ahsc6xn40j847dsrnagxd41w0-gmp-6.3.0.tar.bz2.drv","z7rvbcngls4p928an3ajiawypmhd9rw1-bash52-028.drv","zb8gmns156g9n96zd26cdyg7fhg40v6s-isl-0.20.drv","zbrjpr6k6bl2j2s74yd58ymiijgjry0j-gnu-config-2024-01-01.drv","zrjyn3bprs2s5y9mi6853mqkxg3b8iig-pkg-config-0.29.2.drv","zx152v9ljfsj674vcrn7vmh75b3ihpkr-coreutils-9.7.drv"],"first":[6,3,2,4,2,3,2,3,2,3,3,2,3,2,2,2,2,2,4,4,4,1,3,2,3,3,5,5,3,3,5,2,5,3,2,2,2,4,5,3,2,4,3,3,2,2,3,3,3,2,2,2,2,4,5,2,2,3,4,2,0,4,3,2,2,5,3,2,3,3,2,3,4,4,5,3,2,3,4,2,4,3,3,4,2,5,3,5,3,2,3,5,2,2,3,3,2,3,3,4,2,2,2,5,4,2,3,3,2,4,3,4,2,5,3,5,4,3,5,5,3,1,2,4,5,4,2,4,2,4,4,3,3,2,2,5,3,2,2,3,2,4,3,3,3,5,2,2,3,3,3,2,2,3,3,4,2,3,1,2,5,4,4,2,3,3,2,3,2,2,2,2,3,3,2,3,3,4,5,4,3,3,3,3,4,3,2,2,3,4,4,4,3,4,4,2,4,2,2,3,3,2,3,2,2,4,3,3,3,5,2,2,3,2,3,2,3,4,3,3,2,2,4,5,2],"copies":[24,4,46,34,24,46,24,37,4,19,1,17,34,37,1,37,1,37,31,35,16,10,44,3,35,24,34,25,18,34,3,16,3,23,1,37,1,28,24,4,37,23,33,16,37,6,1,1,5,14,37,1,37,33,3,37,1,33,3,11,1,34,33,37,37,37,40,37,33,33,37,1,40,1,24,43,4,3,2,14,24,3,33,20,1,3,1,23,26,37,5,25,37,37,3,24,37,14,1,38,37,5,37,37,33,13,31,19,4,4,39,23,37,24,14,26,24,35,3,25,2,1,37,34,3,27,23,5,37,23,3,26,33,37,37,3,33,37,37,34,7,5,1,1,24,23,10,2,38,29,28,37,37,43,12,7,37,6,2,33,40,23,23,37,24,42,2,34,11,1,12,1,1,23,37,26,34,37,23,33,30,2,33,25,37,43,37,37,4,23,23,26,20,23,40,15,19,37,15,37,37,37,14,37,4,32,46,33,15,23,3,25,25,37,34,37,37,37,38,36,37,15,16,23,3],"inputs":[[2,125,131,150,180],[],[5,206],[2,19,26],[2,25,106,180,211,212],[],[2,106,149,164,200],[2,66,184],[2,146,170,188],[2,22,126,159,192,196],[],[2,7,9,28,219],[],[],[2,146,170,172,200],[],[2,47,90,170,202],[],[2,19,68,185,205],[2,177],[2,107,150],[2,13,15,17,35,40,44,50,52,55,63,64,67,70,89,92,93,96,100,102,105,112,122,128,133,134,137,138,146,151,152,156,163,170,174,186,187,197,201,203,213,215,220],[2],[2,29,102,105,114,170,195,200],[2,7,216,218,219],[],[2,75,153,216],[],[2,9,107,150],[],[2,170,178],[2,11,28,43,117],[2,168],[],[2,39,86,90,170],[],[2,71,90,147,170],[2,75,153,180],[],[2,109,168],[],[2,149],[2,53,61,66,72,177,200],[2,20,222],[],[2,131,146,170,195],[],[],[],[2,9,11,28,31,69,95,97,107,114,126,192,195,198,200,202,207,208,221],[],[2,167,170],[],[],[2,145,146,170],[],[2,140,142,146,170,224],[2,179,200,216],[2,21,30,32,39,54,76,85,90,118,124,135,140,162,170,195],[2,75,153,170],[21,121,158],[2,13,15,17,35,40,44,50,52,55,63,64,66,67,70,72,89,92,93,96,100,102,112,122,128,133,134,137,138,151,152,156,163,174,177,186,187,197,201,203,213,215,220],[2,3,24,176,216],[],[],[2,66,75,153],[2,72,194],[],[2,29,102,139,148,200,216,218],[2,104,216],[],[],[2,22,165,185],[2,168],[2,27,91,150,180,200],[],[2,90,144,170],[],[],[2,28],[2,175,180],[2,4,6,33,58,83,102,105,126,130,170],[2,3,13,15,17,35,40,44,50,52,55,63,64,67,70,89,92,93,96,100,102,112,122,128,133,134,137,138,151,152,156,163,174,186,187,197,201,203,213,215,216,218,220],[2,68,126,149],[2,46,90,170,204],[2,87,90,170],[],[],[2,149,185],[],[2,114,127,141,155,168],[2,7,42,115,180,200],[],[],[],[2,179,180,200],[],[2,20,200],[2,21,73,168],[2,66],[],[2,48,114,170],[2,7,66,199,200],[2,194],[],[2,22,49,79,126,192],[2,18,22,159,185,205],[2,167,180],[2,7,105,170,219],[2,38,157,170],[],[2,149,223],[],[0,2,7,119,150,180,191],[2,28,43,123,208],[],[2,74,91,113,139,149],[],[2,170,179,200],[],[],[2,4,6,8,11,14,16,21,23,31,34,36,45,49,51,56,59,76,79,84,101,108,126,140,146,147,158,159,166,169,171,195,198,204,210,211,221,224],[],[],[2,140,170,209],[2,110,180],[2,4,6,33,68,102,106,159,173,180,185],[2,7,21,45,119,146,170],[],[2,87,116,180],[2,168],[],[2,66,167],[],[],[2,168,200],[2,19,200],[],[],[2,61,66,123,177],[2,170,175],[2,27,146,155,170,200],[],[],[],[],[2,59,168],[2,21,120,170,181],[2,66,110],[2,3],[2,37,149],[],[],[],[2,28,175],[2,7,115,170,200,202],[],[2,126,168],[2,21,49,79,126,166,168,210,224],[2,24,42,57,62,69,82,132,136,139,148,165,182,185,200,207,214,216,218],[2,22,75,153],[2,145,150,180],[],[],[],[2,22,185],[2,21,23,79,126,168,210,224],[],[2,43,107,154],[2,10,146,170,224],[2,43,105,107,154],[2,21,98,143,146,170],[],[2,41,80,95,111,116,125,129,161,162,180,189,190,191,193,212],[],[],[],[2,65,103],[],[],[2,3,106],[2,78,170],[2,3,12,24,214,216],[],[],[2,22],[],[],[],[2,116,144,180],[2,80,180,209],[2,13,15,17,35,40,44,50,52,55,63,64,67,70,89,92,93,96,100,102,106,112,122,128,133,134,137,138,150,151,152,156,163,174,180,186,187,197,201,203,213,215,220],[2,19,83,126,205],[2,178,180],[2,22,160],[2,28,110],[2,180],[],[2,11,12,28,31,43],[],[2,66,72,148,185,217],[],[2,9,28,43,53,200,208],[],[1,2,101,114,170],[2,216],[],[],[2,9,13,15,17,28,35,40,43,44,50,52,55,63,64,67,70,89,92,93,96,100,102,112,122,128,133,134,137,138,151,152,156,163,174,186,187,197,201,203,213,215,220],[],[2,8,21,81,94,146,157,170,200],[2,88,150,180,183,212],[2,149,200],[],[2,3,24,117,216],[],[2,177,218],[],[2,22,99,165,185],[],[],[2,11,28,43,176],[2,28,75,153],[2,38,88,180],[2,77,101,108,140,170,200,204]]};
+const INST = [[60,0],[21,1],[121,1],[158,1],[2,2],[13,2],[15,2],[17,2],[35,2],[40,2],[44,2],[50,2],[52,2],[55,2],[63,2],[64,2],[67,2],[70,2],[89,2],[92,2],[93,2],[96,2],[100,2],[102,2],[105,2],[112,2],[122,2],[128,2],[133,2],[134,2],[137,2],[138,2],[146,2],[151,2],[152,2],[156,2],[163,2],[170,2],[174,2],[186,2],[187,2],[197,2],[201,2],[203,2],[213,2],[215,2],[220,2],[4,2],[6,2],[8,2],[11,2],[14,2],[16,2],[21,2],[23,2],[31,2],[34,2],[36,2],[45,2],[49,2],[51,2],[56,2],[59,2],[76,2],[79,2],[84,2],[101,2],[108,2],[126,2],[140,2],[147,2],[158,2],[159,2],[166,2],[169,2],[171,2],[195,2],[198,2],[204,2],[210,2],[211,2],[221,2],[224,2],[168,2],[5,3],[206,3],[2,3],[7,3],[66,3],[199,3],[200,3],[22,3],[49,3],[79,3],[126,3],[192,3],[59,3],[168,3],[43,3],[105,3],[107,3],[154,3],[25,3],[106,3],[180,3],[211,3],[212,3],[149,3],[164,3],[146,3],[170,3],[188,3],[9,3],[28,3],[219,3],[172,3],[47,3],[90,3],[202,3],[13,3],[15,3],[17,3],[35,3],[40,3],[44,3],[50,3],[52,3],[55,3],[63,3],[64,3],[67,3],[70,3],[89,3],[92,3],[93,3],[96,3],[100,3],[102,3],[112,3],[122,3],[128,3],[133,3],[134,3],[137,3],[138,3],[151,3],[152,3],[156,3],[163,3],[174,3],[186,3],[187,3],[197,3],[201,3],[203,3],[213,3],[215,3],[220,3],[29,3],[114,3],[195,3],[11,3],[117,3],[39,3],[86,3],[71,3],[147,3],[131,3],[31,3],[69,3],[95,3],[97,3],[198,3],[207,3],[208,3],[221,3],[167,3],[140,3],[142,3],[224,3],[75,3],[153,3],[144,3],[46,3],[204,3],[48,3],[4,3],[6,3],[33,3],[68,3],[159,3],[173,3],[185,3],[175,3],[21,3],[120,3],[181,3],[166,3],[210,3],[24,3],[42,3],[57,3],[62,3],[82,3],[132,3],[136,3],[139,3],[148,3],[165,3],[182,3],[214,3],[216,3],[218,3],[23,3],[10,3],[98,3],[143,3],[110,3],[12,3],[1,3],[101,3],[8,3],[81,3],[94,3],[157,3],[88,3],[150,3],[183,3],[176,3],[77,3],[108,3],[5,4],[206,4],[2,4],[66,4],[184,4],[72,4],[194,4],[148,4],[185,4],[217,4],[9,4],[11,4],[28,4],[31,4],[69,4],[95,4],[97,4],[107,4],[114,4],[126,4],[192,4],[195,4],[198,4],[200,4],[202,4],[207,4],[208,4],[221,4],[4,4],[6,4],[33,4],[68,4],[102,4],[106,4],[159,4],[173,4],[180,4],[19,4],[83,4],[205,4],[75,4],[153,4],[170,4],[43,4],[154,4],[20,4],[222,4],[22,4],[49,4],[79,4],[167,4],[175,4],[18,4],[3,4],[88,4],[150,4],[183,4],[212,4],[149,4],[59,4],[168,4],[105,4],[196,4],[127,4],[141,4],[155,4],[53,4],[7,4],[199,4],[123,4],[110,4],[219,4],[109,4],[21,4],[120,4],[181,4],[117,4],[104,4],[216,4],[179,4],[12,4],[13,4],[15,4],[17,4],[35,4],[40,4],[44,4],[50,4],[52,4],[55,4],[63,4],[64,4],[67,4],[70,4],[89,4],[92,4],[93,4],[96,4],[100,4],[112,4],[122,4],[128,4],[133,4],[134,4],[137,4],[138,4],[151,4],[152,4],[156,4],[163,4],[174,4],[186,4],[187,4],[197,4],[201,4],[203,4],[213,4],[215,4],[220,4],[176,4],[77,4],[101,4],[108,4],[140,4],[204,4],[1,4],[25,4],[211,4],[164,4],[29,4],[139,4],[218,4],[24,4],[42,4],[57,4],[62,4],[82,4],[132,4],[136,4],[165,4],[182,4],[214,4],[41,4],[80,4],[111,4],[116,4],[125,4],[129,4],[161,4],[162,4],[189,4],[190,4],[191,4],[193,4],[146,4],[78,4],[23,4],[210,4],[224,4],[8,4],[81,4],[94,4],[157,4],[61,4],[177,4],[99,4],[73,4],[48,4],[188,4],[58,4],[130,4],[37,4],[5,5],[206,5],[2,5],[72,5],[194,5],[22,5],[165,5],[185,5],[160,5],[66,5],[110,5],[126,5],[159,5],[192,5],[196,5],[7,5],[9,5],[28,5],[219,5],[107,5],[150,5],[11,5],[43,5],[117,5],[104,5],[216,5],[179,5],[180,5],[200,5],[20,5],[167,5],[123,5],[208,5],[4,5],[6,5],[33,5],[68,5],[102,5],[106,5],[173,5],[19,5],[83,5],[205,5],[12,5],[31,5],[148,5],[217,5],[53,5],[13,5],[15,5],[17,5],[35,5],[40,5],[44,5],[50,5],[52,5],[55,5],[63,5],[64,5],[67,5],[70,5],[89,5],[92,5],[93,5],[96,5],[100,5],[112,5],[122,5],[128,5],[133,5],[134,5],[137,5],[138,5],[151,5],[152,5],[156,5],[163,5],[174,5],[186,5],[187,5],[197,5],[201,5],[203,5],[213,5],[215,5],[220,5],[176,5],[25,5],[211,5],[212,5],[149,5],[164,5],[29,5],[139,5],[218,5],[199,5],[18,5],[24,5],[42,5],[57,5],[62,5],[69,5],[82,5],[132,5],[136,5],[182,5],[207,5],[214,5],[41,5],[80,5],[95,5],[111,5],[116,5],[125,5],[129,5],[161,5],[162,5],[189,5],[190,5],[191,5],[193,5],[3,5],[177,5],[105,5],[154,5],[222,5],[175,5],[75,5],[153,5],[97,5],[114,5],[195,5],[198,5],[202,5],[221,5],[26,5],[37,5],[170,5],[49,5],[79,5],[21,5],[45,5],[119,5],[146,5],[27,5],[155,5],[115,5],[184,5],[38,5],[157,5],[78,5],[48,5],[1,5],[101,5],[88,5],[183,5],[61,5],[99,5],[223,5],[74,5],[91,5],[113,5],[87,5],[145,5],[144,5],[209,5],[178,5],[59,5],[168,5],[8,5],[81,5],[94,5],[77,5],[108,5],[140,5],[204,5],[188,5],[58,5],[130,5],[65,5],[103,5],[30,5],[32,5],[39,5],[54,5],[76,5],[85,5],[90,5],[118,5],[124,5],[135,5],[5,6],[206,6],[2,6],[22,6],[165,6],[185,6],[160,6],[75,6],[153,6],[72,6],[194,6],[4,6],[6,6],[33,6],[68,6],[102,6],[106,6],[159,6],[173,6],[180,6],[24,6],[42,6],[57,6],[62,6],[69,6],[82,6],[132,6],[136,6],[139,6],[148,6],[182,6],[200,6],[207,6],[214,6],[216,6],[218,6],[19,6],[83,6],[126,6],[205,6],[66,6],[184,6],[192,6],[196,6],[9,6],[107,6],[150,6],[167,6],[37,6],[149,6],[7,6],[28,6],[219,6],[20,6],[222,6],[177,6],[3,6],[217,6],[13,6],[15,6],[17,6],[35,6],[40,6],[43,6],[44,6],[50,6],[52,6],[55,6],[63,6],[64,6],[67,6],[70,6],[89,6],[92,6],[93,6],[96,6],[100,6],[112,6],[122,6],[128,6],[133,6],[134,6],[137,6],[138,6],[151,6],[152,6],[156,6],[163,6],[174,6],[186,6],[187,6],[197,6],[201,6],[203,6],[213,6],[215,6],[220,6],[25,6],[211,6],[212,6],[164,6],[29,6],[199,6],[18,6],[41,6],[80,6],[95,6],[111,6],[116,6],[125,6],[129,6],[161,6],[162,6],[189,6],[190,6],[191,6],[193,6],[11,6],[117,6],[110,6],[88,6],[183,6],[61,6],[123,6],[99,6],[53,6],[179,6],[176,6],[104,6],[12,6],[175,6],[223,6],[74,6],[91,6],[113,6],[87,6],[145,6],[144,6],[209,6],[178,6],[26,6],[65,6],[103,6],[49,6],[79,6],[208,6],[31,6],[105,6],[154,6],[97,6],[114,6],[195,6],[198,6],[202,6],[221,6],[146,6],[170,6],[131,6],[59,6],[168,6],[115,6],[48,6],[38,6],[27,6],[0,6],[119,6],[188,6],[58,6],[130,6],[1,6],[101,6],[21,6],[30,6],[32,6],[39,6],[54,6],[76,6],[85,6],[90,6],[118,6],[124,6],[135,6],[140,6],[109,6],[127,6],[141,6],[155,6],[5,7],[206,7],[2,7],[22,7],[185,7],[75,7],[153,7],[165,7],[160,7],[25,7],[106,7],[180,7],[211,7],[212,7],[149,7],[164,7],[200,7],[29,7],[102,7],[139,7],[148,7],[216,7],[218,7],[7,7],[66,7],[199,7],[18,7],[159,7],[205,7],[24,7],[42,7],[57,7],[62,7],[69,7],[82,7],[132,7],[136,7],[182,7],[207,7],[214,7],[41,7],[80,7],[95,7],[111,7],[116,7],[125,7],[129,7],[161,7],[162,7],[189,7],[190,7],[191,7],[193,7],[3,7],[219,7],[53,7],[61,7],[72,7],[177,7],[179,7],[176,7],[104,7],[13,7],[15,7],[17,7],[35,7],[40,7],[44,7],[50,7],[52,7],[55,7],[63,7],[64,7],[67,7],[70,7],[89,7],[92,7],[93,7],[96,7],[100,7],[112,7],[122,7],[128,7],[133,7],[134,7],[137,7],[138,7],[151,7],[152,7],[156,7],[163,7],[174,7],[186,7],[187,7],[197,7],[201,7],[203,7],[213,7],[215,7],[220,7],[167,7],[19,7],[123,7],[110,7],[12,7],[217,7],[117,7],[99,7],[68,7],[126,7],[4,7],[6,7],[33,7],[173,7],[194,7],[83,7],[192,7],[196,7],[37,7],[184,7],[9,7],[107,7],[150,7],[28,7],[65,7],[103,7],[26,7],[20,7],[222,7],[88,7],[183,7],[175,7],[223,7],[74,7],[91,7],[113,7],[87,7],[145,7],[144,7],[209,7],[178,7],[38,7],[27,7],[115,7],[0,7],[119,7],[11,7],[31,7],[97,7],[114,7],[195,7],[198,7],[202,7],[208,7],[221,7],[43,7],[49,7],[79,7],[59,7],[168,7],[105,7],[154,7],[170,7],[131,7],[21,7],[30,7],[32,7],[39,7],[54,7],[76,7],[85,7],[90,7],[118,7],[124,7],[135,7],[140,7],[48,7],[146,7],[109,7],[127,7],[141,7],[155,7],[157,7],[45,7],[5,8],[206,8],[2,8],[22,8],[185,8],[75,8],[153,8],[18,8],[159,8],[205,8],[3,8],[106,8],[88,8],[150,8],[180,8],[183,8],[212,8],[149,8],[200,8],[66,8],[72,8],[148,8],[217,8],[7,8],[199,8],[61,8],[123,8],[177,8],[110,8],[218,8],[99,8],[165,8],[184,8],[194,8],[19,8],[68,8],[24,8],[42,8],[57,8],[62,8],[69,8],[82,8],[132,8],[136,8],[139,8],[182,8],[207,8],[214,8],[216,8],[219,8],[53,8],[179,8],[176,8],[104,8],[13,8],[15,8],[17,8],[35,8],[40,8],[44,8],[50,8],[52,8],[55,8],[63,8],[64,8],[67,8],[70,8],[89,8],[92,8],[93,8],[96,8],[100,8],[102,8],[112,8],[122,8],[128,8],[133,8],[134,8],[137,8],[138,8],[151,8],[152,8],[156,8],[163,8],[174,8],[186,8],[187,8],[197,8],[201,8],[203,8],[213,8],[215,8],[220,8],[167,8],[12,8],[117,8],[175,8],[223,8],[74,8],[91,8],[113,8],[87,8],[116,8],[145,8],[144,8],[80,8],[209,8],[178,8],[26,8],[65,8],[103,8],[29,8],[4,8],[6,8],[33,8],[173,8],[25,8],[211,8],[164,8],[41,8],[95,8],[111,8],[125,8],[129,8],[161,8],[162,8],[189,8],[190,8],[191,8],[193,8],[160,8],[126,8],[83,8],[192,8],[196,8],[37,8],[9,8],[107,8],[28,8],[38,8],[27,8],[115,8],[0,8],[119,8],[131,8],[11,8],[43,8],[20,8],[208,8],[31,8],[222,8],[97,8],[114,8],[195,8],[198,8],[202,8],[221,8],[170,8],[154,8],[49,8],[79,8],[105,8],[146,8],[168,8],[109,8],[90,8],[127,8],[141,8],[155,8],[140,8],[59,8],[157,8],[21,8],[45,8],[5,9],[206,9],[2,9],[22,9],[19,9],[68,9],[185,9],[205,9],[24,9],[42,9],[57,9],[62,9],[69,9],[82,9],[132,9],[136,9],[139,9],[148,9],[165,9],[182,9],[200,9],[207,9],[214,9],[216,9],[218,9],[26,9],[18,9],[159,9],[149,9],[37,9],[3,9],[106,9],[66,9],[72,9],[217,9],[194,9],[110,9],[184,9],[13,9],[15,9],[17,9],[35,9],[40,9],[44,9],[50,9],[52,9],[55,9],[63,9],[64,9],[67,9],[70,9],[89,9],[92,9],[93,9],[96,9],[100,9],[102,9],[112,9],[122,9],[128,9],[133,9],[134,9],[137,9],[138,9],[151,9],[152,9],[156,9],[163,9],[174,9],[177,9],[186,9],[187,9],[197,9],[201,9],[203,9],[213,9],[215,9],[220,9],[65,9],[103,9],[99,9],[160,9],[29,9],[7,9],[219,9],[53,9],[61,9],[179,9],[176,9],[104,9],[167,9],[123,9],[12,9],[117,9],[199,9],[38,9],[88,9],[180,9],[27,9],[91,9],[150,9],[115,9],[0,9],[119,9],[191,9],[74,9],[113,9],[175,9],[75,9],[153,9],[25,9],[211,9],[212,9],[164,9],[41,9],[80,9],[95,9],[111,9],[116,9],[125,9],[129,9],[161,9],[162,9],[189,9],[190,9],[193,9],[183,9],[223,9],[87,9],[145,9],[144,9],[209,9],[178,9],[4,9],[6,9],[33,9],[173,9],[126,9],[83,9],[192,9],[196,9],[9,9],[107,9],[131,9],[28,9],[20,9],[222,9],[43,9],[11,9],[208,9],[31,9],[105,9],[154,9],[97,9],[114,9],[195,9],[198,9],[202,9],[221,9],[49,9],[79,9],[59,9],[168,9],[157,9],[170,9],[127,9],[141,9],[155,9],[21,9],[45,9],[146,9],[5,10],[206,10],[2,10],[177,10],[29,10],[102,10],[139,10],[148,10],[200,10],[216,10],[218,10],[22,10],[7,10],[219,10],[53,10],[61,10],[66,10],[72,10],[179,10],[3,10],[24,10],[176,10],[104,10],[13,10],[15,10],[17,10],[35,10],[40,10],[44,10],[50,10],[52,10],[55,10],[63,10],[64,10],[67,10],[70,10],[89,10],[92,10],[93,10],[96,10],[100,10],[112,10],[122,10],[128,10],[133,10],[134,10],[137,10],[138,10],[151,10],[152,10],[156,10],[163,10],[174,10],[186,10],[187,10],[197,10],[201,10],[203,10],[213,10],[215,10],[220,10],[167,10],[19,10],[123,10],[110,10],[185,10],[12,10],[214,10],[217,10],[117,10],[99,10],[165,10],[75,10],[153,10],[68,10],[205,10],[42,10],[57,10],[62,10],[69,10],[82,10],[132,10],[136,10],[182,10],[207,10],[180,10],[26,10],[18,10],[159,10],[194,10],[160,10],[199,10],[65,10],[103,10],[184,10],[149,10],[106,10],[115,10],[37,10],[125,10],[131,10],[150,10],[27,10],[91,10],[0,10],[119,10],[191,10],[88,10],[183,10],[212,10],[175,10],[223,10],[74,10],[113,10],[87,10],[116,10],[145,10],[144,10],[80,10],[209,10],[178,10],[38,10],[25,10],[211,10],[164,10],[41,10],[95,10],[111,10],[129,10],[161,10],[162,10],[189,10],[190,10],[193,10],[4,10],[6,10],[33,10],[173,10],[126,10],[83,10],[192,10],[196,10],[9,10],[107,10],[28,10],[20,10],[222,10],[43,10],[11,10],[49,10],[79,10],[208,10],[31,10],[97,10],[114,10],[195,10],[198,10],[202,10],[221,10],[170,10],[154,10],[168,10],[105,10],[21,10],[45,10],[146,10],[155,10],[59,10],[5,11],[206,11],[2,11],[65,11],[103,11],[7,11],[66,11],[199,11],[200,11],[61,11],[123,11],[177,11],[110,11],[72,11],[148,11],[185,11],[217,11],[218,11],[22,11],[99,11],[165,11],[184,11],[13,11],[15,11],[17,11],[35,11],[40,11],[44,11],[50,11],[52,11],[55,11],[63,11],[64,11],[67,11],[70,11],[89,11],[92,11],[93,11],[96,11],[100,11],[102,11],[112,11],[122,11],[128,11],[133,11],[134,11],[137,11],[138,11],[151,11],[152,11],[156,11],[163,11],[174,11],[186,11],[187,11],[197,11],[201,11],[203,11],[213,11],[215,11],[220,11],[194,11],[19,11],[26,11],[216,11],[219,11],[3,11],[24,11],[117,11],[29,11],[139,11],[53,11],[179,11],[176,11],[104,11],[167,11],[12,11],[214,11],[106,11],[75,11],[153,11],[68,11],[205,11],[42,11],[57,11],[62,11],[69,11],[82,11],[132,11],[136,11],[182,11],[207,11],[160,11],[18,11],[159,11],[180,11],[37,11],[149,11],[115,11],[125,11],[131,11],[150,11],[38,11],[88,11],[27,11],[91,11],[0,11],[119,11],[191,11],[74,11],[113,11],[175,11],[183,11],[212,11],[223,11],[87,11],[116,11],[145,11],[144,11],[80,11],[209,11],[178,11],[25,11],[211,11],[164,11],[41,11],[95,11],[111,11],[129,11],[161,11],[162,11],[189,11],[190,11],[193,11],[4,11],[6,11],[33,11],[173,11],[126,11],[83,11],[192,11],[196,11],[9,11],[107,11],[28,11],[20,11],[222,11],[11,11],[31,11],[97,11],[114,11],[195,11],[198,11],[202,11],[208,11],[221,11],[43,11],[105,11],[154,11],[49,11],[79,11],[146,11],[170,11],[59,11],[168,11],[5,12],[206,12],[2,12],[66,12],[75,12],[153,12],[194,12],[184,12],[72,12],[148,12],[185,12],[217,12],[13,12],[15,12],[17,12],[35,12],[40,12],[44,12],[50,12],[52,12],[55,12],[63,12],[64,12],[67,12],[70,12],[89,12],[92,12],[93,12],[96,12],[100,12],[102,12],[112,12],[122,12],[128,12],[133,12],[134,12],[137,12],[138,12],[151,12],[152,12],[156,12],[163,12],[174,12],[177,12],[186,12],[187,12],[197,12],[201,12],[203,12],[213,12],[215,12],[220,12],[65,12],[103,12],[22,12],[165,12],[110,12],[99,12],[7,12],[199,12],[200,12],[160,12],[216,12],[218,12],[19,12],[26,12],[219,12],[61,12],[123,12],[3,12],[24,12],[117,12],[18,12],[159,12],[205,12],[29,12],[139,12],[53,12],[179,12],[176,12],[104,12],[167,12],[12,12],[214,12],[68,12],[42,12],[57,12],[62,12],[69,12],[82,12],[132,12],[136,12],[182,12],[207,12],[106,12],[180,12],[37,12],[149,12],[115,12],[125,12],[131,12],[150,12],[27,12],[91,12],[0,12],[119,12],[191,12],[38,12],[88,12],[74,12],[113,12],[175,12],[183,12],[212,12],[223,12],[87,12],[116,12],[145,12],[144,12],[80,12],[209,12],[178,12],[25,12],[211,12],[164,12],[41,12],[95,12],[111,12],[129,12],[161,12],[162,12],[189,12],[190,12],[193,12],[4,12],[6,12],[33,12],[173,12],[126,12],[83,12],[192,12],[196,12],[9,12],[107,12],[28,12],[11,12],[43,12],[20,12],[208,12],[31,12],[222,12],[49,12],[79,12],[97,12],[114,12],[195,12],[198,12],[202,12],[221,12],[59,12],[168,12],[105,12],[154,12],[170,12],[5,13],[206,13],[2,13],[72,13],[194,13],[22,13],[160,13],[165,13],[185,13],[66,13],[110,13],[7,13],[199,13],[200,13],[65,13],[103,13],[75,13],[153,13],[184,13],[148,13],[217,13],[177,13],[218,13],[99,13],[216,13],[13,13],[15,13],[17,13],[35,13],[40,13],[44,13],[50,13],[52,13],[55,13],[63,13],[64,13],[67,13],[70,13],[89,13],[92,13],[93,13],[96,13],[100,13],[102,13],[112,13],[122,13],[128,13],[133,13],[134,13],[137,13],[138,13],[151,13],[152,13],[156,13],[163,13],[174,13],[186,13],[187,13],[197,13],[201,13],[203,13],[213,13],[215,13],[220,13],[19,13],[26,13],[219,13],[68,13],[205,13],[24,13],[42,13],[57,13],[62,13],[69,13],[82,13],[132,13],[136,13],[139,13],[182,13],[207,13],[214,13],[61,13],[123,13],[3,13],[117,13],[29,13],[53,13],[179,13],[176,13],[104,13],[167,13],[12,13],[18,13],[159,13],[106,13],[180,13],[37,13],[149,13],[115,13],[125,13],[131,13],[150,13],[27,13],[91,13],[0,13],[119,13],[191,13],[38,13],[88,13],[74,13],[113,13],[175,13],[183,13],[212,13],[223,13],[87,13],[116,13],[145,13],[144,13],[80,13],[209,13],[178,13],[25,13],[211,13],[164,13],[41,13],[95,13],[111,13],[129,13],[161,13],[162,13],[189,13],[190,13],[193,13],[4,13],[6,13],[33,13],[173,13],[126,13],[83,13],[192,13],[196,13],[9,13],[107,13],[28,13],[20,13],[222,13],[43,13],[11,13],[31,13],[97,13],[114,13],[195,13],[198,13],[202,13],[208,13],[221,13],[170,13],[154,13],[49,13],[79,13],[105,13],[5,14],[206,14],[2,14],[22,14],[165,14],[185,14],[160,14],[75,14],[153,14],[72,14],[194,14],[66,14],[184,14],[148,14],[217,14],[110,14],[65,14],[103,14],[99,14],[177,14],[218,14],[7,14],[199,14],[200,14],[216,14],[29,14],[102,14],[139,14],[219,14],[53,14],[61,14],[179,14],[3,14],[24,14],[176,14],[104,14],[13,14],[15,14],[17,14],[35,14],[40,14],[44,14],[50,14],[52,14],[55,14],[63,14],[64,14],[67,14],[70,14],[89,14],[92,14],[93,14],[96,14],[100,14],[112,14],[122,14],[128,14],[133,14],[134,14],[137,14],[138,14],[151,14],[152,14],[156,14],[163,14],[174,14],[186,14],[187,14],[197,14],[201,14],[203,14],[213,14],[215,14],[220,14],[167,14],[19,14],[123,14],[12,14],[214,14],[117,14],[26,14],[68,14],[205,14],[42,14],[57,14],[62,14],[69,14],[82,14],[132,14],[136,14],[182,14],[207,14],[18,14],[159,14],[106,14],[180,14],[37,14],[149,14],[115,14],[125,14],[131,14],[150,14],[27,14],[91,14],[0,14],[119,14],[191,14],[38,14],[88,14],[74,14],[113,14],[175,14],[183,14],[212,14],[223,14],[87,14],[116,14],[145,14],[144,14],[80,14],[209,14],[178,14],[25,14],[211,14],[164,14],[41,14],[95,14],[111,14],[129,14],[161,14],[162,14],[189,14],[190,14],[193,14],[4,14],[6,14],[33,14],[173,14],[126,14],[83,14],[192,14],[196,14],[9,14],[107,14],[28,14],[20,14],[222,14],[11,14],[43,14],[208,14],[31,14],[105,14],[154,14],[97,14],[114,14],[195,14],[198,14],[202,14],[221,14],[49,14],[79,14],[5,15],[206,15],[2,15],[22,15],[185,15],[75,15],[153,15],[165,15],[160,15],[72,15],[194,15],[66,15],[110,15],[65,15],[103,15],[99,15],[184,15],[148,15],[217,15],[177,15],[218,15],[7,15],[199,15],[200,15],[61,15],[123,15],[13,15],[15,15],[17,15],[35,15],[40,15],[44,15],[50,15],[52,15],[55,15],[63,15],[64,15],[67,15],[70,15],[89,15],[92,15],[93,15],[96,15],[100,15],[102,15],[112,15],[122,15],[128,15],[133,15],[134,15],[137,15],[138,15],[151,15],[152,15],[156,15],[163,15],[174,15],[186,15],[187,15],[197,15],[201,15],[203,15],[213,15],[215,15],[220,15],[19,15],[26,15],[216,15],[219,15],[3,15],[24,15],[117,15],[29,15],[139,15],[53,15],[179,15],[176,15],[104,15],[167,15],[12,15],[214,15],[68,15],[205,15],[42,15],[57,15],[62,15],[69,15],[82,15],[132,15],[136,15],[182,15],[207,15],[18,15],[159,15],[106,15],[180,15],[37,15],[149,15],[115,15],[125,15],[131,15],[150,15],[27,15],[91,15],[0,15],[119,15],[191,15],[38,15],[88,15],[74,15],[113,15],[175,15],[183,15],[212,15],[223,15],[87,15],[116,15],[145,15],[144,15],[80,15],[209,15],[178,15],[25,15],[211,15],[164,15],[41,15],[95,15],[111,15],[129,15],[161,15],[162,15],[189,15],[190,15],[193,15],[4,15],[6,15],[33,15],[173,15],[126,15],[83,15],[192,15],[196,15],[9,15],[107,15],[28,15],[20,15],[222,15],[43,15],[11,15],[49,15],[79,15],[208,15],[31,15],[97,15],[114,15],[195,15],[198,15],[202,15],[221,15],[5,16],[206,16],[2,16],[22,16],[185,16],[75,16],[153,16],[165,16],[160,16],[72,16],[194,16],[66,16],[110,16],[65,16],[103,16],[99,16],[184,16],[148,16],[217,16],[13,16],[15,16],[17,16],[35,16],[40,16],[44,16],[50,16],[52,16],[55,16],[63,16],[64,16],[67,16],[70,16],[89,16],[92,16],[93,16],[96,16],[100,16],[102,16],[112,16],[122,16],[128,16],[133,16],[134,16],[137,16],[138,16],[151,16],[152,16],[156,16],[163,16],[174,16],[177,16],[186,16],[187,16],[197,16],[201,16],[203,16],[213,16],[215,16],[220,16],[7,16],[199,16],[200,16],[216,16],[218,16],[19,16],[26,16],[219,16],[61,16],[123,16],[3,16],[24,16],[117,16],[29,16],[139,16],[53,16],[179,16],[176,16],[104,16],[167,16],[12,16],[214,16],[68,16],[205,16],[42,16],[57,16],[62,16],[69,16],[82,16],[132,16],[136,16],[182,16],[207,16],[18,16],[159,16],[106,16],[180,16],[37,16],[149,16],[115,16],[125,16],[131,16],[150,16],[27,16],[91,16],[0,16],[119,16],[191,16],[38,16],[88,16],[74,16],[113,16],[175,16],[183,16],[212,16],[223,16],[87,16],[116,16],[145,16],[144,16],[80,16],[209,16],[178,16],[25,16],[211,16],[164,16],[41,16],[95,16],[111,16],[129,16],[161,16],[162,16],[189,16],[190,16],[193,16],[4,16],[6,16],[33,16],[173,16],[126,16],[83,16],[192,16],[196,16],[9,16],[107,16],[28,16],[20,16],[222,16],[11,16],[31,16],[97,16],[114,16],[195,16],[198,16],[202,16],[208,16],[221,16],[43,16],[5,17],[206,17],[2,17],[22,17],[185,17],[75,17],[153,17],[165,17],[160,17],[72,17],[194,17],[66,17],[110,17],[7,17],[199,17],[200,17],[65,17],[103,17],[184,17],[148,17],[217,17],[177,17],[218,17],[99,17],[216,17],[13,17],[15,17],[17,17],[35,17],[40,17],[44,17],[50,17],[52,17],[55,17],[63,17],[64,17],[67,17],[70,17],[89,17],[92,17],[93,17],[96,17],[100,17],[102,17],[112,17],[122,17],[128,17],[133,17],[134,17],[137,17],[138,17],[151,17],[152,17],[156,17],[163,17],[174,17],[186,17],[187,17],[197,17],[201,17],[203,17],[213,17],[215,17],[220,17],[19,17],[26,17],[219,17],[61,17],[123,17],[3,17],[24,17],[117,17],[29,17],[139,17],[53,17],[179,17],[176,17],[104,17],[167,17],[12,17],[214,17],[68,17],[205,17],[42,17],[57,17],[62,17],[69,17],[82,17],[132,17],[136,17],[182,17],[207,17],[18,17],[159,17],[106,17],[180,17],[37,17],[149,17],[115,17],[125,17],[131,17],[150,17],[27,17],[91,17],[0,17],[119,17],[191,17],[38,17],[88,17],[74,17],[113,17],[175,17],[183,17],[212,17],[223,17],[87,17],[116,17],[145,17],[144,17],[80,17],[209,17],[178,17],[25,17],[211,17],[164,17],[41,17],[95,17],[111,17],[129,17],[161,17],[162,17],[189,17],[190,17],[193,17],[4,17],[6,17],[33,17],[173,17],[126,17],[83,17],[192,17],[196,17],[9,17],[107,17],[28,17],[11,17],[43,17],[20,17],[208,17],[31,17],[222,17],[5,18],[206,18],[2,18],[22,18],[185,18],[75,18],[153,18],[165,18],[160,18],[72,18],[194,18],[66,18],[184,18],[148,18],[217,18],[110,18],[65,18],[103,18],[99,18],[177,18],[218,18],[7,18],[199,18],[200,18],[216,18],[13,18],[15,18],[17,18],[35,18],[40,18],[44,18],[50,18],[52,18],[55,18],[63,18],[64,18],[67,18],[70,18],[89,18],[92,18],[93,18],[96,18],[100,18],[102,18],[112,18],[122,18],[128,18],[133,18],[134,18],[137,18],[138,18],[151,18],[152,18],[156,18],[163,18],[174,18],[186,18],[187,18],[197,18],[201,18],[203,18],[213,18],[215,18],[220,18],[19,18],[26,18],[219,18],[61,18],[123,18],[3,18],[24,18],[117,18],[29,18],[139,18],[53,18],[179,18],[176,18],[104,18],[167,18],[12,18],[214,18],[68,18],[205,18],[42,18],[57,18],[62,18],[69,18],[82,18],[132,18],[136,18],[182,18],[207,18],[18,18],[159,18],[106,18],[180,18],[37,18],[149,18],[115,18],[125,18],[131,18],[150,18],[27,18],[91,18],[0,18],[119,18],[191,18],[38,18],[88,18],[74,18],[113,18],[175,18],[183,18],[212,18],[223,18],[87,18],[116,18],[145,18],[144,18],[80,18],[209,18],[178,18],[25,18],[211,18],[164,18],[41,18],[95,18],[111,18],[129,18],[161,18],[162,18],[189,18],[190,18],[193,18],[4,18],[6,18],[33,18],[173,18],[126,18],[83,18],[192,18],[196,18],[9,18],[107,18],[28,18],[20,18],[222,18],[43,18],[11,18],[5,19],[206,19],[2,19],[22,19],[185,19],[75,19],[153,19],[165,19],[160,19],[72,19],[194,19],[66,19],[110,19],[65,19],[103,19],[99,19],[184,19],[148,19],[217,19],[177,19],[218,19],[7,19],[199,19],[200,19],[216,19],[13,19],[15,19],[17,19],[35,19],[40,19],[44,19],[50,19],[52,19],[55,19],[63,19],[64,19],[67,19],[70,19],[89,19],[92,19],[93,19],[96,19],[100,19],[102,19],[112,19],[122,19],[128,19],[133,19],[134,19],[137,19],[138,19],[151,19],[152,19],[156,19],[163,19],[174,19],[186,19],[187,19],[197,19],[201,19],[203,19],[213,19],[215,19],[220,19],[19,19],[26,19],[219,19],[61,19],[123,19],[3,19],[24,19],[117,19],[29,19],[139,19],[53,19],[179,19],[176,19],[104,19],[167,19],[12,19],[214,19],[68,19],[205,19],[42,19],[57,19],[62,19],[69,19],[82,19],[132,19],[136,19],[182,19],[207,19],[18,19],[159,19],[106,19],[180,19],[37,19],[149,19],[115,19],[125,19],[131,19],[150,19],[27,19],[91,19],[0,19],[119,19],[191,19],[38,19],[88,19],[74,19],[113,19],[175,19],[183,19],[212,19],[223,19],[87,19],[116,19],[145,19],[144,19],[80,19],[209,19],[178,19],[25,19],[211,19],[164,19],[41,19],[95,19],[111,19],[129,19],[161,19],[162,19],[189,19],[190,19],[193,19],[4,19],[6,19],[33,19],[173,19],[126,19],[83,19],[192,19],[196,19],[9,19],[107,19],[28,19],[20,19],[222,19],[5,20],[206,20],[2,20],[22,20],[185,20],[75,20],[153,20],[165,20],[160,20],[72,20],[194,20],[66,20],[110,20],[65,20],[103,20],[99,20],[184,20],[148,20],[217,20],[177,20],[218,20],[7,20],[199,20],[200,20],[216,20],[13,20],[15,20],[17,20],[35,20],[40,20],[44,20],[50,20],[52,20],[55,20],[63,20],[64,20],[67,20],[70,20],[89,20],[92,20],[93,20],[96,20],[100,20],[102,20],[112,20],[122,20],[128,20],[133,20],[134,20],[137,20],[138,20],[151,20],[152,20],[156,20],[163,20],[174,20],[186,20],[187,20],[197,20],[201,20],[203,20],[213,20],[215,20],[220,20],[19,20],[26,20],[219,20],[61,20],[123,20],[3,20],[24,20],[117,20],[29,20],[139,20],[53,20],[179,20],[176,20],[104,20],[167,20],[12,20],[214,20],[68,20],[205,20],[42,20],[57,20],[62,20],[69,20],[82,20],[132,20],[136,20],[182,20],[207,20],[18,20],[159,20],[106,20],[180,20],[37,20],[149,20],[115,20],[125,20],[131,20],[150,20],[27,20],[91,20],[0,20],[119,20],[191,20],[38,20],[88,20],[74,20],[113,20],[175,20],[183,20],[212,20],[223,20],[87,20],[116,20],[145,20],[144,20],[80,20],[209,20],[178,20],[25,20],[211,20],[164,20],[41,20],[95,20],[111,20],[129,20],[161,20],[162,20],[189,20],[190,20],[193,20],[4,20],[6,20],[33,20],[173,20],[126,20],[83,20],[192,20],[196,20],[9,20],[107,20],[28,20],[5,21],[206,21],[2,21],[22,21],[185,21],[75,21],[153,21],[165,21],[160,21],[72,21],[194,21],[66,21],[110,21],[65,21],[103,21],[99,21],[184,21],[148,21],[217,21],[177,21],[218,21],[7,21],[199,21],[200,21],[216,21],[13,21],[15,21],[17,21],[35,21],[40,21],[44,21],[50,21],[52,21],[55,21],[63,21],[64,21],[67,21],[70,21],[89,21],[92,21],[93,21],[96,21],[100,21],[102,21],[112,21],[122,21],[128,21],[133,21],[134,21],[137,21],[138,21],[151,21],[152,21],[156,21],[163,21],[174,21],[186,21],[187,21],[197,21],[201,21],[203,21],[213,21],[215,21],[220,21],[19,21],[26,21],[219,21],[61,21],[123,21],[3,21],[24,21],[117,21],[29,21],[139,21],[53,21],[179,21],[176,21],[104,21],[167,21],[12,21],[214,21],[68,21],[205,21],[42,21],[57,21],[62,21],[69,21],[82,21],[132,21],[136,21],[182,21],[207,21],[18,21],[159,21],[106,21],[180,21],[37,21],[149,21],[115,21],[125,21],[131,21],[150,21],[27,21],[91,21],[0,21],[119,21],[191,21],[38,21],[88,21],[74,21],[113,21],[175,21],[183,21],[212,21],[223,21],[87,21],[116,21],[145,21],[144,21],[80,21],[209,21],[178,21],[25,21],[211,21],[164,21],[41,21],[95,21],[111,21],[129,21],[161,21],[162,21],[189,21],[190,21],[193,21],[4,21],[6,21],[33,21],[173,21],[126,21],[83,21],[192,21],[196,21],[9,21],[107,21],[5,22],[206,22],[2,22],[22,22],[185,22],[75,22],[153,22],[165,22],[160,22],[72,22],[194,22],[66,22],[110,22],[65,22],[103,22],[99,22],[184,22],[148,22],[217,22],[177,22],[218,22],[7,22],[199,22],[200,22],[216,22],[13,22],[15,22],[17,22],[35,22],[40,22],[44,22],[50,22],[52,22],[55,22],[63,22],[64,22],[67,22],[70,22],[89,22],[92,22],[93,22],[96,22],[100,22],[102,22],[112,22],[122,22],[128,22],[133,22],[134,22],[137,22],[138,22],[151,22],[152,22],[156,22],[163,22],[174,22],[186,22],[187,22],[197,22],[201,22],[203,22],[213,22],[215,22],[220,22],[19,22],[26,22],[219,22],[61,22],[123,22],[3,22],[24,22],[117,22],[29,22],[139,22],[53,22],[179,22],[176,22],[104,22],[167,22],[12,22],[214,22],[68,22],[205,22],[42,22],[57,22],[62,22],[69,22],[82,22],[132,22],[136,22],[182,22],[207,22],[18,22],[159,22],[106,22],[180,22],[37,22],[149,22],[115,22],[125,22],[131,22],[150,22],[27,22],[91,22],[0,22],[119,22],[191,22],[38,22],[88,22],[74,22],[113,22],[175,22],[183,22],[212,22],[223,22],[87,22],[116,22],[145,22],[144,22],[80,22],[209,22],[178,22],[25,22],[211,22],[164,22],[41,22],[95,22],[111,22],[129,22],[161,22],[162,22],[189,22],[190,22],[193,22],[4,22],[6,22],[33,22],[173,22],[126,22],[83,22],[192,22],[196,22],[5,23],[206,23],[2,23],[22,23],[185,23],[75,23],[153,23],[165,23],[160,23],[72,23],[194,23],[66,23],[110,23],[65,23],[103,23],[99,23],[184,23],[148,23],[217,23],[177,23],[218,23],[7,23],[199,23],[200,23],[216,23],[13,23],[15,23],[17,23],[35,23],[40,23],[44,23],[50,23],[52,23],[55,23],[63,23],[64,23],[67,23],[70,23],[89,23],[92,23],[93,23],[96,23],[100,23],[102,23],[112,23],[122,23],[128,23],[133,23],[134,23],[137,23],[138,23],[151,23],[152,23],[156,23],[163,23],[174,23],[186,23],[187,23],[197,23],[201,23],[203,23],[213,23],[215,23],[220,23],[19,23],[26,23],[219,23],[61,23],[123,23],[3,23],[24,23],[117,23],[29,23],[139,23],[53,23],[179,23],[176,23],[104,23],[167,23],[12,23],[214,23],[68,23],[205,23],[42,23],[57,23],[62,23],[69,23],[82,23],[132,23],[136,23],[182,23],[207,23],[18,23],[159,23],[106,23],[180,23],[37,23],[149,23],[115,23],[125,23],[131,23],[150,23],[27,23],[91,23],[0,23],[119,23],[191,23],[38,23],[88,23],[74,23],[113,23],[175,23],[183,23],[212,23],[223,23],[87,23],[116,23],[145,23],[144,23],[80,23],[209,23],[178,23],[25,23],[211,23],[164,23],[41,23],[95,23],[111,23],[129,23],[161,23],[162,23],[189,23],[190,23],[193,23],[4,23],[6,23],[33,23],[173,23],[126,23],[83,23],[5,24],[206,24],[2,24],[22,24],[185,24],[75,24],[153,24],[165,24],[160,24],[72,24],[194,24],[66,24],[110,24],[65,24],[103,24],[99,24],[184,24],[148,24],[217,24],[177,24],[218,24],[7,24],[199,24],[200,24],[216,24],[13,24],[15,24],[17,24],[35,24],[40,24],[44,24],[50,24],[52,24],[55,24],[63,24],[64,24],[67,24],[70,24],[89,24],[92,24],[93,24],[96,24],[100,24],[102,24],[112,24],[122,24],[128,24],[133,24],[134,24],[137,24],[138,24],[151,24],[152,24],[156,24],[163,24],[174,24],[186,24],[187,24],[197,24],[201,24],[203,24],[213,24],[215,24],[220,24],[19,24],[26,24],[219,24],[61,24],[123,24],[3,24],[24,24],[117,24],[29,24],[139,24],[53,24],[179,24],[176,24],[104,24],[167,24],[12,24],[214,24],[68,24],[205,24],[42,24],[57,24],[62,24],[69,24],[82,24],[132,24],[136,24],[182,24],[207,24],[18,24],[159,24],[106,24],[180,24],[37,24],[149,24],[115,24],[125,24],[131,24],[150,24],[27,24],[91,24],[0,24],[119,24],[191,24],[38,24],[88,24],[74,24],[113,24],[175,24],[183,24],[212,24],[223,24],[87,24],[116,24],[145,24],[144,24],[80,24],[209,24],[178,24],[25,24],[211,24],[164,24],[41,24],[95,24],[111,24],[129,24],[161,24],[162,24],[189,24],[190,24],[193,24],[4,24],[6,24],[33,24],[173,24],[126,24],[5,25],[206,25],[2,25],[22,25],[185,25],[75,25],[153,25],[165,25],[160,25],[72,25],[194,25],[66,25],[110,25],[65,25],[103,25],[99,25],[184,25],[148,25],[217,25],[177,25],[218,25],[7,25],[199,25],[200,25],[216,25],[13,25],[15,25],[17,25],[35,25],[40,25],[44,25],[50,25],[52,25],[55,25],[63,25],[64,25],[67,25],[70,25],[89,25],[92,25],[93,25],[96,25],[100,25],[102,25],[112,25],[122,25],[128,25],[133,25],[134,25],[137,25],[138,25],[151,25],[152,25],[156,25],[163,25],[174,25],[186,25],[187,25],[197,25],[201,25],[203,25],[213,25],[215,25],[220,25],[19,25],[26,25],[219,25],[61,25],[123,25],[3,25],[24,25],[117,25],[29,25],[139,25],[53,25],[179,25],[176,25],[104,25],[167,25],[12,25],[214,25],[68,25],[205,25],[42,25],[57,25],[62,25],[69,25],[82,25],[132,25],[136,25],[182,25],[207,25],[18,25],[159,25],[106,25],[180,25],[37,25],[149,25],[115,25],[125,25],[131,25],[150,25],[27,25],[91,25],[0,25],[119,25],[191,25],[38,25],[88,25],[74,25],[113,25],[175,25],[183,25],[212,25],[223,25],[87,25],[116,25],[145,25],[144,25],[80,25],[209,25],[178,25],[25,25],[211,25],[164,25],[41,25],[95,25],[111,25],[129,25],[161,25],[162,25],[189,25],[190,25],[193,25],[4,25],[6,25],[33,25],[173,25],[5,26],[206,26],[2,26],[22,26],[185,26],[75,26],[153,26],[165,26],[160,26],[72,26],[194,26],[66,26],[110,26],[65,26],[103,26],[99,26],[184,26],[148,26],[217,26],[177,26],[218,26],[7,26],[199,26],[200,26],[216,26],[13,26],[15,26],[17,26],[35,26],[40,26],[44,26],[50,26],[52,26],[55,26],[63,26],[64,26],[67,26],[70,26],[89,26],[92,26],[93,26],[96,26],[100,26],[102,26],[112,26],[122,26],[128,26],[133,26],[134,26],[137,26],[138,26],[151,26],[152,26],[156,26],[163,26],[174,26],[186,26],[187,26],[197,26],[201,26],[203,26],[213,26],[215,26],[220,26],[19,26],[26,26],[219,26],[61,26],[123,26],[3,26],[24,26],[117,26],[29,26],[139,26],[53,26],[179,26],[176,26],[104,26],[167,26],[12,26],[214,26],[68,26],[205,26],[42,26],[57,26],[62,26],[69,26],[82,26],[132,26],[136,26],[182,26],[207,26],[18,26],[159,26],[106,26],[180,26],[37,26],[149,26],[115,26],[125,26],[131,26],[150,26],[27,26],[91,26],[0,26],[119,26],[191,26],[38,26],[88,26],[74,26],[113,26],[175,26],[183,26],[212,26],[223,26],[87,26],[116,26],[145,26],[144,26],[80,26],[209,26],[178,26],[25,26],[211,26],[164,26],[41,26],[95,26],[111,26],[129,26],[161,26],[162,26],[189,26],[190,26],[193,26],[5,27],[206,27],[2,27],[22,27],[185,27],[75,27],[153,27],[165,27],[160,27],[72,27],[194,27],[66,27],[110,27],[65,27],[103,27],[99,27],[184,27],[148,27],[217,27],[177,27],[218,27],[7,27],[199,27],[200,27],[216,27],[13,27],[15,27],[17,27],[35,27],[40,27],[44,27],[50,27],[52,27],[55,27],[63,27],[64,27],[67,27],[70,27],[89,27],[92,27],[93,27],[96,27],[100,27],[102,27],[112,27],[122,27],[128,27],[133,27],[134,27],[137,27],[138,27],[151,27],[152,27],[156,27],[163,27],[174,27],[186,27],[187,27],[197,27],[201,27],[203,27],[213,27],[215,27],[220,27],[19,27],[26,27],[219,27],[61,27],[123,27],[3,27],[24,27],[117,27],[29,27],[139,27],[53,27],[179,27],[176,27],[104,27],[167,27],[12,27],[214,27],[68,27],[205,27],[42,27],[57,27],[62,27],[69,27],[82,27],[132,27],[136,27],[182,27],[207,27],[18,27],[159,27],[106,27],[180,27],[37,27],[149,27],[115,27],[125,27],[131,27],[150,27],[27,27],[91,27],[0,27],[119,27],[191,27],[38,27],[88,27],[74,27],[113,27],[175,27],[183,27],[212,27],[223,27],[87,27],[116,27],[145,27],[144,27],[80,27],[209,27],[178,27],[5,28],[206,28],[2,28],[22,28],[185,28],[75,28],[153,28],[165,28],[160,28],[72,28],[194,28],[66,28],[110,28],[65,28],[103,28],[99,28],[184,28],[148,28],[217,28],[177,28],[218,28],[7,28],[199,28],[200,28],[216,28],[13,28],[15,28],[17,28],[35,28],[40,28],[44,28],[50,28],[52,28],[55,28],[63,28],[64,28],[67,28],[70,28],[89,28],[92,28],[93,28],[96,28],[100,28],[102,28],[112,28],[122,28],[128,28],[133,28],[134,28],[137,28],[138,28],[151,28],[152,28],[156,28],[163,28],[174,28],[186,28],[187,28],[197,28],[201,28],[203,28],[213,28],[215,28],[220,28],[19,28],[26,28],[219,28],[61,28],[123,28],[3,28],[24,28],[117,28],[29,28],[139,28],[53,28],[179,28],[176,28],[104,28],[167,28],[12,28],[214,28],[68,28],[205,28],[42,28],[57,28],[62,28],[69,28],[82,28],[132,28],[136,28],[182,28],[207,28],[18,28],[159,28],[106,28],[180,28],[37,28],[149,28],[115,28],[125,28],[131,28],[150,28],[27,28],[91,28],[0,28],[119,28],[191,28],[38,28],[88,28],[74,28],[113,28],[175,28],[5,29],[206,29],[2,29],[22,29],[185,29],[75,29],[153,29],[165,29],[160,29],[72,29],[194,29],[66,29],[110,29],[65,29],[103,29],[99,29],[184,29],[148,29],[217,29],[177,29],[218,29],[7,29],[199,29],[200,29],[216,29],[13,29],[15,29],[17,29],[35,29],[40,29],[44,29],[50,29],[52,29],[55,29],[63,29],[64,29],[67,29],[70,29],[89,29],[92,29],[93,29],[96,29],[100,29],[102,29],[112,29],[122,29],[128,29],[133,29],[134,29],[137,29],[138,29],[151,29],[152,29],[156,29],[163,29],[174,29],[186,29],[187,29],[197,29],[201,29],[203,29],[213,29],[215,29],[220,29],[19,29],[26,29],[219,29],[61,29],[123,29],[3,29],[24,29],[117,29],[29,29],[139,29],[53,29],[179,29],[176,29],[104,29],[167,29],[12,29],[214,29],[68,29],[205,29],[42,29],[57,29],[62,29],[69,29],[82,29],[132,29],[136,29],[182,29],[207,29],[18,29],[159,29],[106,29],[180,29],[37,29],[149,29],[115,29],[125,29],[131,29],[150,29],[27,29],[91,29],[0,29],[119,29],[191,29],[5,30],[206,30],[2,30],[22,30],[185,30],[75,30],[153,30],[165,30],[160,30],[72,30],[194,30],[66,30],[110,30],[65,30],[103,30],[99,30],[184,30],[148,30],[217,30],[177,30],[218,30],[7,30],[199,30],[200,30],[216,30],[13,30],[15,30],[17,30],[35,30],[40,30],[44,30],[50,30],[52,30],[55,30],[63,30],[64,30],[67,30],[70,30],[89,30],[92,30],[93,30],[96,30],[100,30],[102,30],[112,30],[122,30],[128,30],[133,30],[134,30],[137,30],[138,30],[151,30],[152,30],[156,30],[163,30],[174,30],[186,30],[187,30],[197,30],[201,30],[203,30],[213,30],[215,30],[220,30],[19,30],[26,30],[219,30],[61,30],[123,30],[3,30],[24,30],[117,30],[29,30],[139,30],[53,30],[179,30],[176,30],[104,30],[167,30],[12,30],[214,30],[68,30],[205,30],[42,30],[57,30],[62,30],[69,30],[82,30],[132,30],[136,30],[182,30],[207,30],[18,30],[159,30],[106,30],[180,30],[37,30],[149,30],[115,30],[125,30],[131,30],[150,30],[5,31],[206,31],[2,31],[22,31],[185,31],[75,31],[153,31],[165,31],[160,31],[72,31],[194,31],[66,31],[110,31],[65,31],[103,31],[99,31],[184,31],[148,31],[217,31],[177,31],[218,31],[7,31],[199,31],[200,31],[216,31],[13,31],[15,31],[17,31],[35,31],[40,31],[44,31],[50,31],[52,31],[55,31],[63,31],[64,31],[67,31],[70,31],[89,31],[92,31],[93,31],[96,31],[100,31],[102,31],[112,31],[122,31],[128,31],[133,31],[134,31],[137,31],[138,31],[151,31],[152,31],[156,31],[163,31],[174,31],[186,31],[187,31],[197,31],[201,31],[203,31],[213,31],[215,31],[220,31],[19,31],[26,31],[219,31],[61,31],[123,31],[3,31],[24,31],[117,31],[29,31],[139,31],[53,31],[179,31],[176,31],[104,31],[167,31],[12,31],[214,31],[68,31],[205,31],[42,31],[57,31],[62,31],[69,31],[82,31],[132,31],[136,31],[182,31],[207,31],[18,31],[159,31],[106,31],[180,31],[37,31],[149,31],[5,32],[206,32],[2,32],[22,32],[185,32],[75,32],[153,32],[165,32],[160,32],[72,32],[194,32],[66,32],[110,32],[65,32],[103,32],[99,32],[184,32],[148,32],[217,32],[177,32],[218,32],[7,32],[199,32],[200,32],[216,32],[13,32],[15,32],[17,32],[35,32],[40,32],[44,32],[50,32],[52,32],[55,32],[63,32],[64,32],[67,32],[70,32],[89,32],[92,32],[93,32],[96,32],[100,32],[102,32],[112,32],[122,32],[128,32],[133,32],[134,32],[137,32],[138,32],[151,32],[152,32],[156,32],[163,32],[174,32],[186,32],[187,32],[197,32],[201,32],[203,32],[213,32],[215,32],[220,32],[19,32],[26,32],[219,32],[61,32],[123,32],[3,32],[24,32],[117,32],[29,32],[139,32],[53,32],[179,32],[176,32],[104,32],[167,32],[12,32],[214,32],[68,32],[205,32],[42,32],[57,32],[62,32],[69,32],[82,32],[132,32],[136,32],[182,32],[207,32],[18,32],[159,32],[106,32],[180,32],[5,33],[206,33],[2,33],[22,33],[185,33],[75,33],[153,33],[165,33],[160,33],[72,33],[194,33],[66,33],[110,33],[65,33],[103,33],[99,33],[184,33],[148,33],[217,33],[177,33],[218,33],[7,33],[199,33],[200,33],[216,33],[13,33],[15,33],[17,33],[35,33],[40,33],[44,33],[50,33],[52,33],[55,33],[63,33],[64,33],[67,33],[70,33],[89,33],[92,33],[93,33],[96,33],[100,33],[102,33],[112,33],[122,33],[128,33],[133,33],[134,33],[137,33],[138,33],[151,33],[152,33],[156,33],[163,33],[174,33],[186,33],[187,33],[197,33],[201,33],[203,33],[213,33],[215,33],[220,33],[19,33],[26,33],[219,33],[61,33],[123,33],[3,33],[24,33],[117,33],[29,33],[139,33],[53,33],[179,33],[176,33],[104,33],[167,33],[12,33],[214,33],[68,33],[205,33],[42,33],[57,33],[62,33],[69,33],[82,33],[132,33],[136,33],[182,33],[207,33],[18,33],[159,33],[106,33],[5,34],[206,34],[2,34],[22,34],[185,34],[75,34],[153,34],[165,34],[160,34],[72,34],[194,34],[66,34],[110,34],[65,34],[103,34],[99,34],[184,34],[148,34],[217,34],[177,34],[218,34],[7,34],[199,34],[200,34],[216,34],[13,34],[15,34],[17,34],[35,34],[40,34],[44,34],[50,34],[52,34],[55,34],[63,34],[64,34],[67,34],[70,34],[89,34],[92,34],[93,34],[96,34],[100,34],[102,34],[112,34],[122,34],[128,34],[133,34],[134,34],[137,34],[138,34],[151,34],[152,34],[156,34],[163,34],[174,34],[186,34],[187,34],[197,34],[201,34],[203,34],[213,34],[215,34],[220,34],[19,34],[26,34],[219,34],[61,34],[123,34],[3,34],[24,34],[117,34],[29,34],[139,34],[53,34],[179,34],[176,34],[104,34],[167,34],[12,34],[214,34],[68,34],[205,34],[42,34],[57,34],[62,34],[69,34],[82,34],[132,34],[136,34],[182,34],[207,34],[18,34],[159,34],[5,35],[206,35],[2,35],[22,35],[185,35],[75,35],[153,35],[165,35],[160,35],[72,35],[194,35],[66,35],[110,35],[65,35],[103,35],[99,35],[184,35],[148,35],[217,35],[177,35],[218,35],[7,35],[199,35],[200,35],[216,35],[13,35],[15,35],[17,35],[35,35],[40,35],[44,35],[50,35],[52,35],[55,35],[63,35],[64,35],[67,35],[70,35],[89,35],[92,35],[93,35],[96,35],[100,35],[102,35],[112,35],[122,35],[128,35],[133,35],[134,35],[137,35],[138,35],[151,35],[152,35],[156,35],[163,35],[174,35],[186,35],[187,35],[197,35],[201,35],[203,35],[213,35],[215,35],[220,35],[19,35],[26,35],[219,35],[61,35],[123,35],[3,35],[24,35],[117,35],[29,35],[139,35],[53,35],[179,35],[176,35],[104,35],[167,35],[12,35],[214,35],[68,35],[205,35],[42,35],[57,35],[62,35],[69,35],[82,35],[132,35],[136,35],[182,35],[207,35],[5,36],[206,36],[2,36],[22,36],[185,36],[75,36],[153,36],[165,36],[160,36],[72,36],[194,36],[66,36],[110,36],[65,36],[103,36],[99,36],[184,36],[148,36],[217,36],[177,36],[218,36],[7,36],[199,36],[200,36],[216,36],[13,36],[15,36],[17,36],[35,36],[40,36],[44,36],[50,36],[52,36],[55,36],[63,36],[64,36],[67,36],[70,36],[89,36],[92,36],[93,36],[96,36],[100,36],[102,36],[112,36],[122,36],[128,36],[133,36],[134,36],[137,36],[138,36],[151,36],[152,36],[156,36],[163,36],[174,36],[186,36],[187,36],[197,36],[201,36],[203,36],[213,36],[215,36],[220,36],[19,36],[26,36],[219,36],[61,36],[123,36],[3,36],[24,36],[117,36],[29,36],[139,36],[53,36],[179,36],[176,36],[104,36],[167,36],[12,36],[214,36],[5,37],[206,37],[2,37],[22,37],[185,37],[75,37],[153,37],[165,37],[160,37],[72,37],[194,37],[66,37],[110,37],[65,37],[103,37],[99,37],[184,37],[148,37],[217,37],[177,37],[218,37],[7,37],[199,37],[200,37],[216,37],[13,37],[15,37],[17,37],[35,37],[40,37],[44,37],[50,37],[52,37],[55,37],[63,37],[64,37],[67,37],[70,37],[89,37],[92,37],[93,37],[96,37],[100,37],[102,37],[112,37],[122,37],[128,37],[133,37],[134,37],[137,37],[138,37],[151,37],[152,37],[156,37],[163,37],[174,37],[186,37],[187,37],[197,37],[201,37],[203,37],[213,37],[215,37],[220,37],[19,37],[26,37],[219,37],[61,37],[123,37],[3,37],[24,37],[117,37],[5,38],[206,38],[2,38],[22,38],[185,38],[75,38],[153,38],[165,38],[160,38],[72,38],[194,38],[66,38],[110,38],[65,38],[103,38],[99,38],[184,38],[148,38],[217,38],[177,38],[218,38],[7,38],[199,38],[200,38],[216,38],[13,38],[15,38],[17,38],[35,38],[40,38],[44,38],[50,38],[52,38],[55,38],[63,38],[64,38],[67,38],[70,38],[89,38],[92,38],[93,38],[96,38],[100,38],[102,38],[112,38],[122,38],[128,38],[133,38],[134,38],[137,38],[138,38],[151,38],[152,38],[156,38],[163,38],[174,38],[186,38],[187,38],[197,38],[201,38],[203,38],[213,38],[215,38],[220,38],[19,38],[26,38],[219,38],[5,39],[206,39],[2,39],[22,39],[185,39],[75,39],[153,39],[165,39],[160,39],[72,39],[194,39],[66,39],[110,39],[65,39],[103,39],[99,39],[184,39],[148,39],[217,39],[177,39],[218,39],[7,39],[199,39],[200,39],[216,39],[5,40],[206,40],[2,40],[22,40],[185,40],[75,40],[153,40],[165,40],[160,40],[72,40],[194,40],[66,40],[110,40],[65,40],[103,40],[99,40],[184,40],[148,40],[217,40],[177,40],[218,40],[5,41],[206,41],[2,41],[22,41],[185,41],[75,41],[153,41],[165,41],[160,41],[72,41],[194,41],[66,41],[110,41],[65,41],[103,41],[99,41],[5,42],[206,42],[2,42],[22,42],[185,42],[75,42],[153,42],[165,42],[160,42],[72,42],[194,42],[66,42],[5,43],[206,43],[2,43],[22,43],[185,43],[75,43],[153,43],[165,43],[160,43],[72,43],[194,43],[5,44],[206,44],[2,44],[22,44],[185,44],[75,44],[153,44],[165,44],[160,44],[5,45],[206,45],[2,45],[22,45],[185,45],[75,45],[153,45],[5,46],[206,46],[2,46],[22,46],[5,47],[206,47],[2,47],[5,48],[206,48]];
+const GCC = 158;
+const STDLINUX = 121;
+const ROOT = 60;
+try {
+var NLAYERS = 0;
+for (var _i = 0; _i < INST.length; _i++) {
+  if (INST[_i][1] + 1 > NLAYERS) NLAYERS = INST[_i][1] + 1;
+}
+var first = DRV.first;
+var labels = DRV.labels;
+var ids = DRV.ids;
+var copies = DRV.copies;
+var inputs = DRV.inputs;
+
+function isDup(drv, depth) { return depth !== first[drv]; }
+function shortLab(drv) {
+  var lab = labels[drv].replace(/\.drv$/,'');
+  return lab.length > 15 ? lab.slice(0, 14) + '...' : lab;
+}
+
+var nodeW = 104, nodeH = 20, gapX = 4, gapY = 3, maxCols = 18, left = 56;
+var NS = 'http://www.w3.org/2000/svg';
+
+function buildLayout() {
+  var by = [];
+  for (var d = 0; d < NLAYERS; d++) by[d] = [];
+  for (var k = 0; k < INST.length; k++) {
+    var p = INST[k];
+    by[p[1]].push({ drv: p[0], depth: p[1] });
+  }
+  for (d = 0; d < NLAYERS; d++) {
+    by[d].sort(function (a, b) {
+      var da = isDup(a.drv, a.depth) ? 1 : 0;
+      var db = isDup(b.drv, b.depth) ? 1 : 0;
+      if (da !== db) return da - db;
+      return labels[a.drv] < labels[b.drv] ? -1 : labels[a.drv] > labels[b.drv] ? 1 : 0;
+    });
+  }
+  var pos = {};
+  var ranks = [];
+  var y = 48;
+  for (d = 0; d < NLAYERS; d++) {
+    var arr = by[d];
+    var cols = Math.min(maxCols, Math.max(1, arr.length));
+    var rows = Math.ceil(arr.length / cols) || 1;
+    var h = 22 + rows * (nodeH + gapY) + 6;
+    ranks.push({ d: d, y: y, h: h, n: arr.length, cols: cols, rows: rows });
+    for (var i = 0; i < arr.length; i++) {
+      var it = arr[i];
+      var col = i % cols, row = Math.floor(i / cols);
+      pos[it.drv + '@' + it.depth] = {
+        x: left + col * (nodeW + gapX),
+        y: y + 22 + row * (nodeH + gapY),
+        w: nodeW, h: nodeH, drv: it.drv, depth: it.depth
+      };
+    }
+    y += h + 10;
+  }
+  return { pos: pos, ranks: ranks, width: left + maxCols * (nodeW + gapX) + 28, height: y + 20 };
+}
+
+var L = buildLayout();
+
+function nodeFill(p) {
+  if (p.drv === ROOT) return { fill: '#1d4ed8', stroke: '#1d4ed8', fg: '#fff' };
+  if (isDup(p.drv, p.depth)) return { fill: '#ffedd5', stroke: '#c2410c', fg: '#9a3412' };
+  return { fill: '#fff', stroke: '#94a3b8', fg: '#0f172a' };
+}
+
+function el(name, attrs) {
+  var n = document.createElementNS(NS, name);
+  if (attrs) {
+    for (var k in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    }
+  }
+  return n;
+}
+
+function txt(x, y, content, attrs) {
+  var t = el('text', attrs);
+  t.setAttribute('x', x);
+  t.setAttribute('y', y);
+  t.textContent = content;
+  return t;
+}
+
+var stage = document.getElementById('stage');
+var svg = el('svg', {
+  xmlns: NS,
+  viewBox: '0 0 ' + L.width + ' ' + L.height,
+  preserveAspectRatio: 'xMinYMin meet'
+});
+svg.style.fontFamily = 'Segoe UI, system-ui, sans-serif';
+svg.style.display = 'block';
+var viewport = el('g', { id: 'viewport' });
+svg.appendChild(viewport);
+viewport.appendChild(el('rect', {
+  x: '0', y: '0', width: String(L.width), height: String(L.height), fill: '#f8fafc'
+}));
+viewport.appendChild(txt(16, 28, NLAYERS + ' layers — chaque boite est une instance .drv', {
+  'font-size': '16', 'font-weight': '700', fill: '#0f172a'
+}));
+viewport.appendChild(txt(16, 44, 'Blanc = premiere apparition · orange = copie · bleu = mario · clic = tout l arbre de dependances', {
+  'font-size': '11', fill: '#64748b'
+}));
+
+for (var ri = 0; ri < L.ranks.length; ri++) {
+  var r = L.ranks[ri];
+  viewport.appendChild(el('rect', {
+    x: '8', y: String(r.y), width: String(L.width - 16), height: String(r.h),
+    rx: '8', fill: '#eef2ff'
+  }));
+  viewport.appendChild(txt(14, r.y + 15, 'L' + r.d + '  ' + r.n + ' .drv', {
+    'font-size': '11', 'font-weight': '700', fill: '#334155'
+  }));
+}
+
+var edgeG = el('g', { id: 'edges', fill: 'none', stroke: '#1d4ed8', 'stroke-width': '1.4', opacity: '0.8' });
+viewport.appendChild(edgeG);
+
+var nodeEls = [];
+var keys = Object.keys(L.pos);
+for (var ni = 0; ni < keys.length; ni++) {
+  var key = keys[ni];
+  var p = L.pos[key];
+  var c = nodeFill(p);
+  var g = el('g', { 'class': 'node', 'data-drv': String(p.drv), 'data-depth': String(p.depth), 'data-key': key });
+  g.style.cursor = 'pointer';
+  var title = document.createElementNS(NS, 'title');
+  title.textContent = labels[p.drv] + '  L' + p.depth + (isDup(p.drv, p.depth) ? ' (copie)' : ' (premiere)');
+  g.appendChild(title);
+  g.appendChild(el('rect', {
+    x: String(p.x), y: String(p.y), width: String(p.w), height: String(p.h),
+    rx: '4', fill: c.fill, stroke: c.stroke
+  }));
+  g.appendChild(txt(p.x + p.w / 2, p.y + p.h / 2 + 1, shortLab(p.drv), {
+    'text-anchor': 'middle', 'dominant-baseline': 'middle', 'font-size': '9', fill: c.fg
+  }));
+  viewport.appendChild(g);
+  nodeEls.push(g);
+}
+
+stage.innerHTML = '';
+stage.appendChild(svg);
+
+var panel = document.getElementById('panel');
+var selKey = null;
+
+function edgePath(a, b) {
+  var x1 = a.x + a.w / 2, y1 = a.y + a.h;
+  var x2 = b.x + b.w / 2, y2 = b.y;
+  var mid = (y1 + y2) / 2;
+  return 'M ' + x1 + ' ' + y1 + ' C ' + x1 + ' ' + mid + ', ' + x2 + ' ' + mid + ', ' + x2 + ' ' + y2;
+}
+
+function collectDeps(drv, depth) {
+  var keep = {};
+  var stack = [[drv, depth]];
+  while (stack.length) {
+    var cur = stack.pop();
+    var k = cur[0] + '@' + cur[1];
+    if (keep[k]) continue;
+    keep[k] = true;
+    var ins = inputs[cur[0]] || [];
+    for (var i = 0; i < ins.length; i++) {
+      var nk = ins[i] + '@' + (cur[1] + 1);
+      if (L.pos[nk]) stack.push([ins[i], cur[1] + 1]);
+    }
+  }
+  return keep;
+}
+
+function drawDepEdges(keep) {
+  while (edgeG.firstChild) edgeG.removeChild(edgeG.firstChild);
+  var ks = Object.keys(keep);
+  for (var i = 0; i < ks.length; i++) {
+    var from = L.pos[ks[i]];
+    if (!from) continue;
+    var ins = inputs[from.drv] || [];
+    for (var j = 0; j < ins.length; j++) {
+      var tk = ins[j] + '@' + (from.depth + 1);
+      if (!keep[tk]) continue;
+      var to = L.pos[tk];
+      if (to) edgeG.appendChild(el('path', { d: edgePath(from, to) }));
+    }
+  }
+}
+
+function clearHot() {
+  selKey = null;
+  for (var i = 0; i < nodeEls.length; i++) {
+    nodeEls[i].classList.remove('dim', 'hot', 'dep');
+  }
+  while (edgeG.firstChild) edgeG.removeChild(edgeG.firstChild);
+  panel.style.display = 'none';
+}
+
+function highlight(drv, depth) {
+  var key = drv + '@' + depth;
+  selKey = key;
+  var keep = collectDeps(drv, depth);
+  var nDep = Object.keys(keep).length;
+  for (var i = 0; i < nodeEls.length; i++) {
+    var k = nodeEls[i].getAttribute('data-key');
+    nodeEls[i].classList.toggle('dim', !keep[k]);
+    nodeEls[i].classList.toggle('hot', k === key);
+    nodeEls[i].classList.toggle('dep', !!keep[k] && k !== key);
+  }
+  drawDepEdges(keep);
+  document.getElementById('pTitle').textContent = labels[drv];
+  document.getElementById('pMeta').textContent =
+    'L' + depth + (isDup(drv, depth) ? ' (copie)' : ' (premiere)') +
+    '  |  ' + nDep + ' noeuds dans l arbre de dependances' +
+    '  |  ' + (inputs[drv] || []).length + ' entrees directes';
+  document.getElementById('pId').textContent = ids[drv];
+  panel.style.display = 'block';
+}
+
+for (var ei = 0; ei < nodeEls.length; ei++) {
+  (function (g) {
+    g.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      if (didDrag) return;
+      var drv = +g.getAttribute('data-drv');
+      var depth = +g.getAttribute('data-depth');
+      var key = drv + '@' + depth;
+      if (selKey === key) clearHot(); else highlight(drv, depth);
+    });
+  })(nodeEls[ei]);
+}
+svg.addEventListener('click', function () {
+  if (!didDrag) clearHot();
+});
+
+document.getElementById('q').addEventListener('input', function (ev) {
+  var q = ev.target.value.trim().toLowerCase();
+  if (!q) { clearHot(); return; }
+  for (var i = 0; i < labels.length; i++) {
+    if (labels[i].toLowerCase().indexOf(q) >= 0 || ids[i].toLowerCase().indexOf(q) >= 0) {
+      highlight(i, first[i]);
+      return;
+    }
+  }
+});
+
+var scale = 1, dragging = false, didDrag = false, lx = 0, ly = 0, sx = 0, sy = 0;
+
+function applySize() {
+  svg.setAttribute('width', String(Math.round(L.width * scale)));
+  svg.setAttribute('height', String(Math.round(L.height * scale)));
+}
+
+function fitWidth() {
+  var w = stage.clientWidth || 900;
+  scale = Math.max(0.12, Math.min(2.2, (w - 24) / L.width));
+  applySize();
+  stage.scrollLeft = 0;
+  stage.scrollTop = 0;
+}
+
+function zoomAt(clientX, clientY, factor) {
+  var rect = stage.getBoundingClientRect();
+  var cx = clientX - rect.left;
+  var cy = clientY - rect.top;
+  var wx = (stage.scrollLeft + cx) / scale;
+  var wy = (stage.scrollTop + cy) / scale;
+  scale = Math.min(4, Math.max(0.12, scale * factor));
+  applySize();
+  stage.scrollLeft = wx * scale - cx;
+  stage.scrollTop = wy * scale - cy;
+}
+
+var jumpEl = document.getElementById('jump');
+if (jumpEl) {
+  jumpEl.min = '0';
+  jumpEl.max = String(Math.max(0, NLAYERS - 1));
+}
+
+fitWidth();
+
+stage.addEventListener('wheel', function (ev) {
+  if (ev.ctrlKey || ev.metaKey) {
+    ev.preventDefault();
+    zoomAt(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.12 : 0.89);
+  }
+}, { passive: false });
+
+stage.addEventListener('mousedown', function (ev) {
+  if (ev.button !== 0) return;
+  if (!svg.contains(ev.target)) return;
+  ev.preventDefault();
+  dragging = true;
+  didDrag = false;
+  lx = ev.clientX;
+  ly = ev.clientY;
+  sx = stage.scrollLeft;
+  sy = stage.scrollTop;
+  stage.classList.add('drag');
+});
+window.addEventListener('mouseup', function () {
+  dragging = false;
+  stage.classList.remove('drag');
+});
+window.addEventListener('mousemove', function (ev) {
+  if (!dragging) return;
+  var dx = ev.clientX - lx;
+  var dy = ev.clientY - ly;
+  if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag = true;
+  if (!didDrag) return;
+  stage.scrollLeft = sx - dx;
+  stage.scrollTop = sy - dy;
+});
+
+function gotoLayer(d) {
+  var r = L.ranks[d];
+  document.getElementById('jumpLab').textContent = 'L' + d;
+  stage.scrollTop = Math.max(0, r.y * scale - 16);
+}
+
+document.getElementById('jump').addEventListener('input', function (ev) {
+  gotoLayer(+ev.target.value);
+});
+
+document.getElementById('reset').onclick = function () {
+  fitWidth();
+  document.getElementById('q').value = '';
+  document.getElementById('jump').value = '0';
+  document.getElementById('jumpLab').textContent = 'L0';
+  clearHot();
+};
+
+var zoomInBtn = document.getElementById('zoomIn');
+var zoomOutBtn = document.getElementById('zoomOut');
+if (zoomInBtn) zoomInBtn.onclick = function () {
+  zoomAt(stage.getBoundingClientRect().left + stage.clientWidth / 2,
+    stage.getBoundingClientRect().top + stage.clientHeight / 2, 1.2);
+};
+if (zoomOutBtn) zoomOutBtn.onclick = function () {
+  zoomAt(stage.getBoundingClientRect().left + stage.clientWidth / 2,
+    stage.getBoundingClientRect().top + stage.clientHeight / 2, 1 / 1.2);
+};
+
+function download(name, blob) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+}
+document.getElementById('dlSvg').onclick = function () {
+  var copy = svg.cloneNode(true);
+  copy.removeAttribute('style');
+  download('mario-drv-dupliques-49-layers.svg', new Blob(
+    ['<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(copy)],
+    { type: 'image/svg+xml' }
+  ));
+};
+
+} catch (e) {
+var box = document.getElementById('err');
+box.style.display = 'block';
+box.textContent = 'Erreur: ' + (e && e.message ? e.message : e);
+console.error(e);
+}
+</script>
+</body>
+</html>

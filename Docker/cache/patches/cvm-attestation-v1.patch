@@ -1,0 +1,171 @@
+# © 2026 Nokia
+# Licensed under the MIT License
+# SPDX-License-Identifier: MIT
+
+diff --git a/harmonia-cache/src/config.rs b/harmonia-cache/src/config.rs
+index cdd295b..cc8da66 100644
+--- a/harmonia-cache/src/config.rs
++++ b/harmonia-cache/src/config.rs
+@@ -30,6 +30,10 @@ fn default_enable_compression() -> bool {
+     false
+ }
+
++fn default_cvm_attestation_dir() -> PathBuf {
++    "/var/lib/nix-certification".into()
++}
++
+ /// zstd parameters applied to on-the-fly NAR encoding when the client sends
+ /// `Accept-Encoding: zstd`. Defaults are tuned for a substitution cache:
+ /// level 1 with long-distance matching beats the libzstd default (level 3)
+@@ -136,6 +140,11 @@ pub(crate) struct Config {
+     pub(crate) secret_keys: Vec<SecretKey>,
+     #[serde(skip)]
+     pub(crate) store: Store,
++
++    /// Directory holding out-of-band CVM attestation files,
++    /// one JSON per store path, named <hashPart>.json.
++    #[serde(default = "default_cvm_attestation_dir")]
++    pub(crate) cvm_attestation_dir: PathBuf,
+ }
+
+ impl Config {
+diff --git a/harmonia-cache/src/narinfo.rs b/harmonia-cache/src/narinfo.rs
+index 61a964b..afd116d 100644
+--- a/harmonia-cache/src/narinfo.rs
++++ b/harmonia-cache/src/narinfo.rs
+@@ -2,8 +2,9 @@ use crate::error::{CacheError, StoreError};
+ use actix_web::{HttpResponse, http, web};
+ use harmonia_store_nar_info::{build_narinfo, format_narinfo_txt};
+ use harmonia_store_path::StorePathHash;
+-use harmonia_store_path_info::StorePathKeyed;
++use harmonia_store_path_info::{CvmAttestation, StorePathKeyed};
+ use serde::Deserialize;
++use std::path::Path;
+
+ use crate::config::Config;
+ use crate::{cache_control_max_age_1d, some_or_404};
+@@ -13,6 +14,37 @@ pub struct Param {
+     json: Option<String>,
+ }
+
++/// On-disk attestation file, one per store path.
++/// Unknown fields (version, producer, derivation, timestamp) are ignored.
++#[derive(Debug, Deserialize)]
++struct CvmAttestationFile {
++    #[serde(rename = "type")]
++    attestation_type: String,
++    backend: String,
++    quote: String,
++    #[serde(rename = "outputHash")]
++    output_hash: String,
++    #[serde(default)]
++    inputs: Vec<String>,
++}
++
++/// Reads the attestation for a store path, if one was published.
++/// A missing or malformed file is not an error: the narinfo is then
++/// served without the Cvm* fields.
++fn read_attestation(dir: &Path, hash: &str) -> Option<CvmAttestation> {
++    let raw = std::fs::read_to_string(dir.join(format!("{hash}.json"))).ok()?;
++    let f: CvmAttestationFile = serde_json::from_str(&raw).ok()?;
++    let mut inputs = f.inputs;
++    inputs.sort();
++    Some(CvmAttestation {
++        attestation_type: f.attestation_type,
++        backend: f.backend,
++        quote: f.quote,
++        output_hash: f.output_hash,
++        input_hashes: inputs,
++    })
++}
++
+ pub(crate) async fn get(
+     hash: web::Path<String>,
+     param: web::Query<Param>,
+@@ -42,6 +74,7 @@ pub(crate) async fn get(
+         &hash,
+         &settings.secret_keys,
+     );
++    let cvm = read_attestation(&settings.cvm_attestation_dir, &hash);
+
+     if param.json.is_some() {
+         // JSON format: return the full nar-info (upstream JSON v3 format).
+@@ -50,7 +83,7 @@ pub(crate) async fn get(
+             .json(&narinfo.info))
+     } else {
+         let url = narinfo.info.url.clone().unwrap_or_default();
+-        let res = format_narinfo_txt(settings.store.store_dir(), &narinfo);
++        let res = format_narinfo_txt(settings.store.store_dir(), &narinfo, cvm.as_ref());
+         Ok(HttpResponse::Ok()
+             .insert_header((http::header::CONTENT_TYPE, "text/x-nix-narinfo"))
+             .insert_header(("Nix-Link", url))
+diff --git a/harmonia-store-nar-info/src/lib.rs b/harmonia-store-nar-info/src/lib.rs
+index b4890c6..0da9a95 100644
+--- a/harmonia-store-nar-info/src/lib.rs
++++ b/harmonia-store-nar-info/src/lib.rs
+@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize, Serializer};
+ use harmonia_store_content_address::ContentAddress;
+ use harmonia_store_path::{StoreDir, StorePath};
+ use harmonia_store_path_info::{
+-    NarHash, StorePathKeyed, UnkeyedValidPathInfo, ValidPathInfo, fingerprint_path,
++    NarHash, CvmAttestation ,StorePathKeyed, UnkeyedValidPathInfo, ValidPathInfo, fingerprint_path,
+ };
+ use harmonia_utils_hash::{Hash, fmt::Base32};
+ use harmonia_utils_signature::{SecretKey, Signature};
+@@ -82,7 +82,7 @@ macro_rules! push_line {
+ }
+
+ /// Format a `NarInfo` as the textual narinfo format used by the binary cache protocol.
+-pub fn format_narinfo_txt(store_dir: &StoreDir, narinfo: &NarInfo) -> Vec<u8> {
++pub fn format_narinfo_txt(store_dir: &StoreDir, narinfo: &NarInfo, cvm: Option<&CvmAttestation>,) -> Vec<u8> {
+     use harmonia_utils_hash::HashFormat as _;
+
+     let path = &narinfo.path;
+@@ -141,6 +141,17 @@ pub fn format_narinfo_txt(store_dir: &StoreDir, narinfo: &NarInfo) -> Vec<u8> {
+     if let Some(ca) = &pi.ca {
+         push_line!(result, b"CA: ", ca.to_string().as_bytes());
+     }
++
++    // CVM attestation: supplied out-of-band, not read from the Nix database.
++    if let Some(c) = cvm {
++        push_line!(result, b"CvmAttestationType: ", c.attestation_type.as_bytes());
++        push_line!(result, b"CvmBackend: ", c.backend.as_bytes());
++        push_line!(result, b"CvmQuote: ", c.quote.as_bytes());
++        push_line!(result, b"CvmOutputHash: ", c.output_hash.as_bytes());
++       if !c.input_hashes.is_empty() {
++            push_line!(result, b"CvmInputHashes: ", c.input_hashes.join(" ").as_bytes());
++        }
++    }
+
+     result
+ }
+diff --git a/harmonia-store-path-info/src/lib.rs b/harmonia-store-path-info/src/lib.rs
+index 966f123..140f3ae 100644
+--- a/harmonia-store-path-info/src/lib.rs
++++ b/harmonia-store-path-info/src/lib.rs
+@@ -92,12 +92,23 @@ pub fn fingerprint_path(
+ 
+     result
+ }
+-
+ /// Serializes in "pure" format, omitting impure fields when they have default values.
+ /// Used for content-addressed paths.
+ #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+ pub struct Pure<T>(pub T);
+ 
++/// CVM attestation attached to a store path.
++/// Not read from the Nix database: supplied out-of-band by the publisher.
++#[derive(Debug, Clone, PartialEq, Eq, Hash)]
++#[cfg_attr(any(test, feature = "test"), derive(Arbitrary))]
++pub struct CvmAttestation {
++    pub attestation_type: String,
++    pub backend: String,
++    pub quote: String,
++    pub output_hash: String,
++    pub input_hashes: Vec<String>,
++}
++
+ #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+ #[cfg_attr(any(test, feature = "test"), derive(Arbitrary))]
+ pub struct UnkeyedValidPathInfo {
+

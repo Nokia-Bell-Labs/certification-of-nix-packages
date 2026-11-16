@@ -1,0 +1,102 @@
+# © 2026 Nokia
+# Licensed under the MIT License
+# SPDX-License-Identifier: MIT
+
+services:
+  # Harmonia read :5000 + token-gated PUT :5001 in one container.
+  # Image /nix stays in the container (runtime). Volume /certified_store starts empty
+  # and only grows from PUT :5001.
+  cache:
+    build:
+      context: ./cache
+      args:
+        HARMONIA_REV: "${HARMONIA_REV:-b14686ad852e280d877577fd1db5e696320b14e5}"
+    container_name: nixtee-cache
+    hostname: cache
+    ports:
+      - "${CACHE_PORT:-5000}:5000"
+      - "${PUBLISH_PORT:-5001}:5001"
+    environment:
+      CACHE_ROOT: /certified_store
+      ATTESTATION_DIR: /var/lib/nix-certification
+      PUBLISH_TOKEN: "${HARMONIA_PUBLISH_TOKEN:-nixtee-demo-token}"
+      PUBLISH_BIND: "0.0.0.0:5001"
+      MAX_NAR_BYTES: "${MAX_NAR_BYTES:-8589934592}"
+      # Refuse any NAR without a CACTEE certificate that verifies.
+      REQUIRE_CERTIFICATE: "${REQUIRE_CERTIFICATE:-1}"
+      CACTEE_MANIFEST: /etc/nixtee/cactee-manifest.json
+      # Simulated CACTEE has no Azure token: skip the JWT check (only here).
+      CACTEE_AZURE_SIMULATE: "${CACTEE_AZURE_SIMULATE:-1}"
+    volumes:
+      - harmonia-store:/certified_store
+      - attestations:/var/lib/nix-certification
+      - ./cache/nar-import-server.py:/usr/local/bin/nar-import-server.py:ro
+    restart: unless-stopped
+    networks: [nixtee]
+
+  # Builds locally, then PUTs NARs to cache:5001. Certifies via HTTP to cactee.
+  publisher:
+    image: nixtee-publisher:fork
+    container_name: nixtee-publisher
+    hostname: publisher
+    depends_on: [cache, cactee]
+    environment:
+      HARMONIA_URL: "http://cache:5000"
+      IMPORT_URL: "http://cache:5001"
+      HARMONIA_PUBLISH_TOKEN: "${HARMONIA_PUBLISH_TOKEN:-nixtee-demo-token}"
+      CACTEE_URL: "http://cactee:8080"
+    volumes:
+      - publisher-store:/nix
+      - ../cactee-pkgs/mario-dep:/mario-dep
+    networks: [nixtee]
+    command: ["sleep", "infinity"]
+
+  # Same fork image as the publisher. Verification is on; Azure stays simulated.
+  client:
+    image: nixtee-publisher:fork
+    container_name: nixtee-client
+    hostname: client
+    depends_on: [cache]
+    volumes:
+      - client-store:/nix
+      - ./node/node-init.sh:/usr/local/bin/node-init:ro
+      - attestations:/var/lib/nix-certification:ro
+    environment:
+      SUBSTITUTERS: "http://cache:5000"
+      VERIFY_ATTESTATION: "1"
+      CACTEE_AZURE_SIMULATE: "1"
+    networks: [nixtee]
+    command: ["sleep", "infinity"]
+
+  # CACTEE harness: POST /certify with a tar of the package dir (config.json).
+  # Mount the checkout at the SAME host path so test_docker.py bind-mounts
+  # (via docker.sock) land on this filesystem, not a dummy /cactee on the host.
+  cactee:
+    build:
+      context: .
+      dockerfile: cactee/Dockerfile
+    container_name: nixtee-cactee
+    hostname: cactee
+    ports:
+      - "${CACTEE_PORT:-8080}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${CACTEE_HOST_PATH}:${CACTEE_HOST_PATH}
+    environment:
+      CACTEE_ROOT: ${CACTEE_HOST_PATH}
+      # Simulated certifier only. Values must match Docker/cache/cactee-manifest.json.
+      CACTEE_MRENCLAVE: "9cd38b0f69562e81f5ae50e1a57b79b454f7f68595a7d4e5e34b6c75c4d154c8"
+      CACTEE_SERVICE_CODE_HASH: "b853d36744e9ca4b7105b25c5e3dd26d91c99f166bce1ed8264bbf77eaefe683"
+      CACTEE_SERVICE_DEPENDENCIES_HASH: "91aa92dc4e204aead93fd0797c991dab8fb8b198138e4ad3dc803e350a809d2b"
+      CACTEE_SERVICE_TOOLS_HASHES: '{"huggingface":"86e3b11ab5475b83ada1f34cae1089aff14eb236e3814fbb42228d517a5c8bb9","build_tools.py":"95fb3d065af5c8c1b25e0cb22a76c193cafe57158c7eee85849bc1c94bf8f4ab"}'
+    networks: [nixtee]
+
+volumes:
+  harmonia-store:
+  publisher-store:
+  client-store:
+  attestations:
+
+networks:
+  nixtee:
+    driver: bridge
